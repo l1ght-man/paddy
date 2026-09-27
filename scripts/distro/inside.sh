@@ -188,7 +188,7 @@ if [ "$SETUP" != debian-sway ]; then
   # ---- tray click (StatusNotifierItem.Activate) opens the quick list
   tray=$(dbus-send --session --print-reply --dest=org.kde.StatusNotifierWatcher /StatusNotifierWatcher org.freedesktop.DBus.Properties.Get string:org.kde.StatusNotifierWatcher string:RegisteredStatusNotifierItems 2>/dev/null | grep -oE 'org\.kde\.StatusNotifierItem-[0-9]+-[0-9]+' | head -1)
   if [ -n "$tray" ]; then
-    dbus-send --session --dest=$tray /StatusNotifierItem org.kde.StatusNotifierItem.Activate int32:0 int32:0 2>/dev/null; sleep 1.2
+    dbus-send --session --print-reply --dest=$tray /StatusNotifierItem org.kde.StatusNotifierItem.Activate int32:0 int32:0 >/dev/null 2>&1; sleep 1.2
     [ -n "$(visible 'paddy quick list')" ] && pass "clicking the tray icon opens the quick list" || fail "tray Activate did not open the quick list"
     xdotool key Escape; sleep 0.6
   fi
