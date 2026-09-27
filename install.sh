@@ -1,8 +1,8 @@
 #!/bin/sh
 # paddy installer / uninstaller.
 #
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/paddy/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/paddy/main/install.sh | sh -s -- --uninstall
+#   curl -fsSL https://raw.githubusercontent.com/l1ght-man/paddy/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/l1ght-man/paddy/main/install.sh | sh -s -- --uninstall
 #
 # Options:  --uninstall    remove everything this script installed (your vaults are kept)
 #           --from-source  build with cargo instead of downloading a release
@@ -14,7 +14,7 @@
 # It never touches your vaults or settings.
 set -eu
 
-REPO="${PADDY_REPO:-OWNER/paddy}"
+REPO="${PADDY_REPO:-l1ght-man/paddy}"
 BASE_URL="${PADDY_BASE_URL:-https://github.com/$REPO/releases/latest/download}"
 ASSET="paddy-x86_64-linux.tar.gz"
 MARK="# added by the paddy installer"
