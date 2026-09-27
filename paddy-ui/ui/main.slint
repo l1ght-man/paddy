@@ -1241,6 +1241,55 @@ component SettingsPage inherits Rectangle {
                         }
                     }
                     Panel {
+                        title: "background";
+                        SettingRow {
+                            label: "start on login";
+                            TBtn {
+                                label: AppState.autostart-on ? "on" : "off";
+                                on: AppState.autostart-on;
+                                clicked => {
+                                    AppState.toggle-autostart();
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        SettingRow {
+                            label: "start hidden";
+                            TBtn {
+                                label: AppState.start-hidden-on ? "on" : "off";
+                                on: AppState.start-hidden-on;
+                                clicked => {
+                                    AppState.toggle-start-hidden();
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        SettingRow {
+                            label: "close to tray";
+                            TBtn {
+                                label: AppState.close-to-tray-on ? "on" : "off";
+                                on: AppState.close-to-tray-on;
+                                clicked => {
+                                    AppState.toggle-close-to-tray();
+                                }
+                            }
+                            Rectangle { }
+                            TBtn {
+                                label: "quit";
+                                clicked => {
+                                    AppState.quit-app();
+                                }
+                            }
+                        }
+                        Text {
+                            text: "start hidden: at login only the tray icon and hotkey. close to tray: the close button hides paddy; quit from the tray.";
+                            color: Palette.dim;
+                            wrap: word-wrap;
+                            // don't widen the column: wrap to whatever width the panel gets
+                            preferred-width: 1px;
+                        }
+                    }
+                    Panel {
                         title: "resources (this app)";
                         Text {
                             text: AppState.diag-text;

@@ -62,6 +62,7 @@ tar xzf paddy-x86_64-linux.tar.gz && ./paddy-x86_64-linux/paddy
 - **Entries**: label, tags, key/value fields (secrets can be masked), markdown notes with a preview (`Ctrl+E`).
 - **Templates**: `ssh {user}@{host}` style commands, auto-filled from the selected entry (`Ctrl+T`). Four built-in packs (network engineering, recon, file transfer/tunnels, Windows/AD).
 - **Quick list**: tray icon or global hotkey (`Ctrl+Alt+P`, X11) opens a small searchable popup; `Ctrl+1..4` copies a field.
+- **Runs in the background**: closing the window hides paddy to the tray (quit from the tray menu); optional start on login, hidden in the tray by default; launching it again just brings the running one back. All three are on the settings tab.
 - **Looks**: 12 themes, downloadable fonts (checksum-verified), text size, spacing, a floppy logo.
 - **Keys**: every shortcut can be rebound on the keys tab (`Ctrl+K`); `F1` lists them.
 
@@ -98,6 +99,8 @@ Tested in containers on Kali rolling + XFCE, Debian 11 + Openbox and Fedora + i3
 |---|---|
 | settings | `~/.config/paddy/config` (plain text, hand-editable, e.g. `key.save = ctrl+s`) |
 | vaults, themes, fonts | `~/.local/share/paddy/` |
+| start on login | `~/.config/autostart/paddy.desktop` (only while that setting is on) |
+| running instance | a socket in `$XDG_RUNTIME_DIR` (`paddy-<hash>.sock`) |
 | everything, for testing | set `PADDY_HOME=/some/dir` |
 
 ## Security

@@ -114,6 +114,12 @@ pub struct Config {
     /// Always show the small floating "paddy" button (it also appears by itself
     /// whenever there is no system tray to click, e.g. under WSL).
     pub mini_button: bool,
+    /// Start paddy when the user logs in (an XDG autostart entry, see `autostart`).
+    pub autostart: bool,
+    /// When launched at login (`--autostart`), stay in the tray instead of opening the window.
+    pub start_hidden: bool,
+    /// Closing the main window hides it; paddy keeps running in the tray until "Quit".
+    pub close_to_tray: bool,
     pub window_bar: WindowBar,
     /// Font family for the whole UI (a monospace font suits the look).
     pub font: String,
@@ -135,6 +141,9 @@ impl Default for Config {
             hotkey: "ctrl+alt+p".into(),
             last_vault: None,
             mini_button: false,
+            autostart: false,
+            start_hidden: true,
+            close_to_tray: true,
             window_bar: WindowBar::Auto,
             font: DEFAULT_FONT.into(),
             font_size: DEFAULT_FONT_SIZE,
@@ -170,6 +179,9 @@ impl Config {
                 "hotkey" if !v.is_empty() => cfg.hotkey = v.to_string(),
                 "last_vault" if !v.is_empty() => cfg.last_vault = Some(PathBuf::from(v)),
                 "mini_button" => cfg.mini_button = v == "true",
+                "autostart" => cfg.autostart = v == "true",
+                "start_hidden" => cfg.start_hidden = v != "false",
+                "close_to_tray" => cfg.close_to_tray = v != "false",
                 "window_bar" => cfg.window_bar = WindowBar::parse(v).unwrap_or(cfg.window_bar),
                 "font" if !v.is_empty() => cfg.font = v.to_string(),
                 "font_size" => {
@@ -198,10 +210,13 @@ impl Config {
             crate::fsutil::ensure_private_dir(parent)?;
         }
         let mut text = format!(
-            "theme = {}\nhotkey = {}\nmini_button = {}\nwindow_bar = {}\nfont = {}\nfont_size = {}\ndensity = {}\nanimations = {}\nclip_clear_secs = {}\n",
+            "theme = {}\nhotkey = {}\nmini_button = {}\nautostart = {}\nstart_hidden = {}\nclose_to_tray = {}\nwindow_bar = {}\nfont = {}\nfont_size = {}\ndensity = {}\nanimations = {}\nclip_clear_secs = {}\n",
             self.theme,
             clean(&self.hotkey),
             self.mini_button,
+            self.autostart,
+            self.start_hidden,
+            self.close_to_tray,
             self.window_bar.as_str(),
             clean(&self.font),
             self.font_size,
@@ -261,6 +276,32 @@ impl Paths {
     pub fn default_vault(&self) -> PathBuf {
         self.vaults_dir.join("default.db")
     }
+
+    /// XDG autostart entry: `<config home>/autostart/paddy.desktop`, next to the
+    /// `paddy/` config folder (so `$PADDY_HOME` keeps it under `$PADDY_HOME/config`).
+    pub fn autostart_file(&self) -> PathBuf {
+        let config_home = self.config_file.parent().and_then(Path::parent).unwrap_or(Path::new("."));
+        config_home.join("autostart/paddy.desktop")
+    }
+
+    /// Unix socket of the running instance. Lives in `$XDG_RUNTIME_DIR` (the paddy
+    /// data folder when that is unset) and is named after the data folder, so a
+    /// `$PADDY_HOME` instance never talks to the real one.
+    pub fn instance_socket(&self) -> PathBuf {
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute() && p.is_dir());
+        self.instance_socket_in(runtime.as_deref())
+    }
+
+    fn instance_socket_in(&self, runtime: Option<&Path>) -> PathBuf {
+        let data = self.vaults_dir.parent().unwrap_or(&self.vaults_dir);
+        let dir = runtime.unwrap_or(data);
+        dir.join(format!("paddy-{:016x}.sock", fnv1a(data.as_os_str().as_encoded_bytes())))
+    }
+}
+
+/// Small stable hash (FNV-1a, 64 bit): the same path gives the same name in every build.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3))
 }
 
 #[cfg(test)]
@@ -276,6 +317,9 @@ mod tests {
             hotkey: "super+space".into(),
             last_vault: Some("/x/y z/lab.db".into()),
             mini_button: true,
+            autostart: true,
+            start_hidden: false,
+            close_to_tray: false,
             window_bar: WindowBar::Builtin,
             font: "Fira Code".into(),
             font_size: 17,
@@ -333,6 +377,9 @@ mod tests {
             "theme",
             "hotkey",
             "mini_button",
+            "autostart",
+            "start_hidden",
+            "close_to_tray",
             "window_bar",
             "font",
             "font_size",
@@ -387,6 +434,39 @@ mod tests {
         assert!(Density::Normal.row_scale() < Density::Roomy.row_scale());
         assert!(Density::Compact.gap_scale() < Density::Normal.gap_scale());
         assert!(Density::Normal.gap_scale() < Density::Roomy.gap_scale());
+    }
+
+    #[test]
+    fn background_settings_defaults_and_parsing() {
+        let d = Config::default();
+        assert_eq!((d.autostart, d.start_hidden, d.close_to_tray), (false, true, true), "opt-in login start");
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config");
+        // an older config file without the keys keeps the defaults
+        fs::write(&path, "theme = light\n").unwrap();
+        let c = Config::load(&path);
+        assert_eq!((c.autostart, c.start_hidden, c.close_to_tray), (false, true, true));
+        fs::write(&path, "autostart = true\nstart_hidden = false\nclose_to_tray = false\n").unwrap();
+        let c = Config::load(&path);
+        assert_eq!((c.autostart, c.start_hidden, c.close_to_tray), (true, false, false));
+        // garbage: autostart stays off, the others stay on
+        fs::write(&path, "autostart = yes\nstart_hidden = maybe\nclose_to_tray = 0\n").unwrap();
+        let c = Config::load(&path);
+        assert_eq!((c.autostart, c.start_hidden, c.close_to_tray), (false, true, true));
+    }
+
+    #[test]
+    fn autostart_file_and_socket_follow_the_paddy_folders() {
+        let p = Paths::under(Path::new("/h/config"), Path::new("/h/data"));
+        assert_eq!(p.autostart_file(), PathBuf::from("/h/config/autostart/paddy.desktop"));
+        let other = Paths::under(Path::new("/o/config"), Path::new("/o/data"));
+        let run = Path::new("/run/user/1000");
+        let (a, b) = (p.instance_socket_in(Some(run)), other.instance_socket_in(Some(run)));
+        assert!(a.starts_with(run) && b.starts_with(run));
+        assert_ne!(a, b, "a PADDY_HOME instance must not share the real one's socket");
+        assert_eq!(a, p.instance_socket_in(Some(run)), "stable name");
+        assert!(p.instance_socket_in(None).starts_with("/h/data/paddy"), "no runtime dir: the data folder");
+        assert!(a.as_os_str().len() < 100, "fits a unix socket address");
     }
 
     #[test]

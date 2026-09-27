@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Paddy core: data model, vault storage and template logic. No UI code here.
 
+mod autostart;
 mod config;
 mod error;
 mod fontcat;
@@ -13,6 +14,7 @@ mod template;
 mod theme;
 mod vault;
 
+pub use autostart::{autostart_installed, desktop_entry as autostart_entry, set_autostart, AUTOSTART_FLAG};
 pub use config::{
     running_under_wsl, Config, Density, Paths, WindowBar, DEFAULT_FONT, DEFAULT_FONT_SIZE, MAX_FONT_SIZE, MIN_FONT_SIZE,
 };
