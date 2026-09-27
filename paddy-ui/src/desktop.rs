@@ -13,6 +13,8 @@ pub enum DesktopEvent {
 
 pub struct Desktop {
     rx: Receiver<DesktopEvent>,
+    /// Kept so other sources (a second paddy launch) can feed the same queue.
+    tx: Sender<DesktopEvent>,
     /// What could not be set up (no tray host, hotkey taken, ...), for the status line.
     pub problems: Vec<String>,
     /// True when a tray icon was registered with a tray host.
@@ -26,16 +28,17 @@ impl Desktop {
         let (tx, rx) = channel();
         let mut problems = Vec::new();
         #[cfg(target_os = "linux")]
-        let (keep, tray_ok) = linux::start(tx, hotkey, &mut problems);
+        let (keep, tray_ok) = linux::start(tx.clone(), hotkey, &mut problems);
         #[cfg(not(target_os = "linux"))]
         let tray_ok = false;
         #[cfg(not(target_os = "linux"))]
         {
-            let _ = (tx, hotkey);
+            let _ = hotkey;
             problems.push("tray and hotkey are not implemented on this platform yet".into());
         }
         Self {
             rx,
+            tx,
             problems,
             tray_ok,
             #[cfg(target_os = "linux")]
@@ -45,6 +48,11 @@ impl Desktop {
 
     pub fn try_recv(&self) -> Option<DesktopEvent> {
         self.rx.try_recv().ok()
+    }
+
+    /// Another way in to the same event queue the tray and hotkey use.
+    pub fn sender(&self) -> Sender<DesktopEvent> {
+        self.tx.clone()
     }
 }
 

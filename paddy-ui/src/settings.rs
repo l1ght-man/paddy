@@ -28,6 +28,10 @@ impl App {
         bind!(on_close_help, close_help);
         bind!(on_apply_hotkey, apply_hotkey);
         bind!(on_toggle_mini, toggle_mini);
+        bind!(on_toggle_autostart, toggle_autostart);
+        bind!(on_toggle_start_hidden, toggle_start_hidden);
+        bind!(on_toggle_close_to_tray, toggle_close_to_tray);
+        bind!(on_quit_app, quit);
         bind!(on_set_window_bar, set_window_bar, mode);
         bind!(on_copy_path, copy_path, p);
 
@@ -39,6 +43,7 @@ impl App {
         let hotkey = self.config.borrow().hotkey.clone();
         let (cfg, vaults) = (self.paths.config_file.display().to_string(), self.paths.vaults_dir.display().to_string());
         let mini = self.mini.window().is_visible();
+        self.sync_background_state();
         self.with_state(|s| {
             s.set_settings_hotkey(hotkey.into());
             s.set_settings_note("".into());
@@ -133,6 +138,60 @@ impl App {
             let _ = self.mini.hide();
         }
         self.with_state(|s| s.set_mini_on(show));
+    }
+
+    fn sync_background_state(&self) {
+        let c = self.config.borrow();
+        let (login, hidden, close) = (c.autostart, c.start_hidden, c.close_to_tray);
+        drop(c);
+        self.with_state(|s| {
+            s.set_autostart_on(login);
+            s.set_start_hidden_on(hidden);
+            s.set_close_to_tray_on(close);
+        });
+    }
+
+    /// Start on login: write or remove the XDG autostart entry, then remember the choice.
+    pub fn toggle_autostart(&self) {
+        let on = !self.config.borrow().autostart;
+        let file = self.paths.autostart_file();
+        let res = std::env::current_exe().and_then(|exe| paddy_core::set_autostart(&file, on, &exe));
+        if let Err(e) = res {
+            self.note(&format!("could not {} {}: {e}", if on { "write" } else { "remove" }, file.display()));
+            return;
+        }
+        self.config.borrow_mut().autostart = on;
+        let res = self.config.borrow().save(&self.paths.config_file);
+        if self.report(res).is_some() {
+            self.note(&if on {
+                format!("paddy will start when you log in ({})", file.display())
+            } else {
+                "paddy won't start on login any more".to_string()
+            });
+        }
+        self.sync_background_state();
+    }
+
+    pub fn toggle_start_hidden(&self) {
+        let on = !self.config.borrow().start_hidden;
+        self.config.borrow_mut().start_hidden = on;
+        let res = self.config.borrow().save(&self.paths.config_file);
+        self.report(res);
+        self.note(if on { "at login paddy starts in the tray" } else { "at login paddy opens its window" });
+        self.sync_background_state();
+    }
+
+    pub fn toggle_close_to_tray(&self) {
+        let on = !self.config.borrow().close_to_tray;
+        self.config.borrow_mut().close_to_tray = on;
+        let res = self.config.borrow().save(&self.paths.config_file);
+        self.report(res);
+        self.note(if on {
+            "closing the window keeps paddy running; quit from the tray"
+        } else {
+            "closing the window quits paddy"
+        });
+        self.sync_background_state();
     }
 
     fn copy_path(&self, path: SharedString) {

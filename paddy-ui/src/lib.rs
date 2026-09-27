@@ -1,8 +1,11 @@
 #![deny(unsafe_code)]
 pub mod app;
+mod background;
 pub mod desktop;
 mod diag;
 pub mod fonts;
+#[cfg(unix)]
+pub mod instance;
 mod keys;
 pub mod logo;
 mod look;

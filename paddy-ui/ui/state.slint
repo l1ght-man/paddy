@@ -149,6 +149,10 @@ export global AppState {
     in-out property <string> settings-hotkey;
     in property <string> settings-note;
     in property <bool> mini-on;
+    // running in the background
+    in property <bool> autostart-on;
+    in property <bool> start-hidden-on: true;
+    in property <bool> close-to-tray-on: true;
     // themes
     in property <string> theme-name;
     in-out property <string> tp-query;
@@ -250,6 +254,10 @@ export global AppState {
     callback close-help();
     callback apply-hotkey();
     callback toggle-mini();
+    callback toggle-autostart();
+    callback toggle-start-hidden();
+    callback toggle-close-to-tray();
+    callback quit-app();
     callback copy-path(string);
     callback search-edited();
 

@@ -32,6 +32,7 @@ export global PopupState {
     // Bound chords (keymap) are offered here first; true = handled.
     callback key-capture(string, bool, bool, bool, bool) -> bool;
     callback hide();
+    callback open-main();
 }
 
 export component QuickWindow inherits Window {
@@ -157,6 +158,12 @@ export component QuickWindow inherits Window {
                     text: PopupState.status;
                     color: Palette.accent;
                     vertical-alignment: center;
+                }
+                TBtn {
+                    label: "open paddy";
+                    clicked => {
+                        PopupState.open-main();
+                    }
                 }
             }
             HorizontalLayout {

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use paddy_core::{Config, Paths, Vault};
+use paddy_core::{Config, Paths, Vault, AUTOSTART_FLAG};
 use paddy_ui::{app, MainWindow};
 use slint::ComponentHandle;
 
@@ -45,25 +45,45 @@ fn select_backend() -> Result<(), slint::PlatformError> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    select_backend()?;
     let paths = Paths::discover();
+    // One paddy per user: a second launch asks the running one to show its window.
+    #[cfg(unix)]
+    let mut primary = match paddy_ui::instance::claim(&paths.instance_socket()) {
+        Ok(paddy_ui::instance::Claim::Forwarded) => return Ok(()),
+        Ok(paddy_ui::instance::Claim::First(p)) => Some(p),
+        Err(e) => {
+            eprintln!("paddy: single-instance check failed ({e}); starting anyway");
+            None
+        }
+    };
+    let at_login = std::env::args().skip(1).any(|a| a == AUTOSTART_FLAG);
+
+    select_backend()?;
     let mut config = Config::load(&paths.config_file);
     let vault = open_startup_vault(&mut config, &paths)?;
+    let start_hidden = at_login && config.start_hidden;
 
     let ui = MainWindow::new()?;
     let app = app::App::new(&ui, vault, config, paths);
     ui.window().on_close_requested({
         let app = app.clone();
-        move || {
-            // Closing the main window ends the app (popup included) after saving.
-            app.save_on_exit();
-            let _ = slint::quit_event_loop();
-            slint::CloseRequestResponse::HideWindow
-        }
+        move || app.close_requested()
     });
     app.start_desktop();
+    #[cfg(unix)]
+    if let Some(p) = primary.as_mut() {
+        app.listen_for_launches(p);
+    }
     ui.invoke_focus_list();
-    ui.run()?;
+    if start_hidden {
+        // Started at login: only the tray icon (or the floating launcher) and the hotkey.
+        app.hide_main();
+    } else {
+        ui.show()?;
+    }
+    // Keeps running with no window on screen; only "Quit" (or close with close-to-tray off) ends it.
+    slint::run_event_loop_until_quit()?;
+    let _ = ui.hide();
     app.save_on_exit();
     Ok(())
 }

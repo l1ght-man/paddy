@@ -32,6 +32,13 @@ impl App {
         bind!(on_field_step, quick_field_step, d);
         bind!(on_key_capture, quick_key_capture, t, c, a, s, m);
         bind!(on_hide, quick_hide);
+        {
+            let app = self.clone();
+            st.on_open_main(move || {
+                app.quick_hide();
+                app.show_main();
+            });
+        }
     }
 
     /// Start the tray icon + global hotkey and route their events to the UI.
@@ -67,17 +74,8 @@ impl App {
     fn on_desktop_event(&self, ev: DesktopEvent) {
         match ev {
             DesktopEvent::TogglePopup => self.toggle_popup(),
-            DesktopEvent::ShowMain => {
-                if let Some(ui) = self.ui.upgrade() {
-                    let _ = ui.show();
-                    crate::windowctl::focus(ui.window());
-                    self.focus_list();
-                }
-            }
-            DesktopEvent::Quit => {
-                self.save_on_exit();
-                let _ = slint::quit_event_loop();
-            }
+            DesktopEvent::ShowMain => self.show_main(),
+            DesktopEvent::Quit => self.quit(),
         }
     }
 
