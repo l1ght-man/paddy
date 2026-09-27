@@ -1,0 +1,319 @@
+import { Palette } from "theme.slint";
+import { FieldRow } from "state.slint";
+import { Panel, TInput, TBtn, WinBtn } from "widgets.slint";
+
+export struct QuickRow {
+    id: int,
+    label: string,
+    tags: string,
+}
+
+// State of the quick-list popup (its own window, so its own global).
+export global PopupState {
+    in property <string> vault-name;
+    in-out property <string> query;
+    in property <[QuickRow]> rows;
+    in-out property <int> selected: -1;
+    in property <[FieldRow]> fields;
+    in property <string> status;
+    in property <bool> builtin-bar;
+
+    callback query-edited();
+    callback select(int);
+    callback field-edited(int, string);
+    callback field-copy(int);
+    callback field-toggle-hidden(int);
+    callback hide();
+}
+
+export component QuickWindow inherits Window {
+    title: "paddy quick list";
+    // Embedded at build time: Slint only hands images with a cache key to the window manager.
+    icon: @image-url("../../assets/icons/paddy-256.png");
+    preferred-width: 680px;
+    preferred-height: 440px;
+    min-width: 520px;
+    min-height: 320px;
+    background: Palette.bg;
+    default-font-family: Palette.font;
+    default-font-size: Palette.fs;
+    always-on-top: true;
+    no-frame: PopupState.builtin-bar;
+    callback drag-window(length, length);
+    callback close-window();
+    callback start-drag() -> bool;
+    property <bool> native-move;
+
+    public function focus-query() {
+        q.focus-input();
+    }
+
+    FocusScope {
+        // Captured (not a KeyBinding): the search TextInput would otherwise eat the arrows.
+        capture-key-pressed(e) => {
+            if (e.text == Key.UpArrow) {
+                if (PopupState.selected > 0) {
+                    PopupState.select(PopupState.selected - 1);
+                }
+                return accept;
+            }
+            if (e.text == Key.DownArrow) {
+                if (PopupState.selected < PopupState.rows.length - 1) {
+                    PopupState.select(PopupState.selected + 1);
+                }
+                return accept;
+            }
+            reject
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                PopupState.hide();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "1");
+            activated => {
+                PopupState.field-copy(0);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "2");
+            activated => {
+                PopupState.field-copy(1);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "3");
+            activated => {
+                PopupState.field-copy(2);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + "4");
+            activated => {
+                PopupState.field-copy(3);
+            }
+        }
+
+        VerticalLayout {
+            padding: Palette.gap * 1.5;
+            padding-top: PopupState.builtin-bar ? 0px : 12px;
+            spacing: Palette.gap * 1.25;
+            if PopupState.builtin-bar: Rectangle {
+                height: Palette.row + 8px;
+                TouchArea {
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.down) {
+                            root.native-move = false;
+                        }
+                    }
+                    moved => {
+                        if (!root.native-move) {
+                            root.native-move = root.start-drag();
+                        }
+                        if (!root.native-move) {
+                            root.drag-window(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    Text {
+                        text: "paddy quick list";
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { }
+                    WinBtn {
+                        glyph: "×";
+                        hover: Palette.warn.with-alpha(0.35);
+                        clicked => {
+                            root.close-window();
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: Palette.gap;
+                Text {
+                    text: "paddy";
+                    color: Palette.accent;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: "▸ " + PopupState.vault-name;
+                    color: Palette.fg;
+                    vertical-alignment: center;
+                }
+                q := TInput {
+                    horizontal-stretch: 1;
+                    placeholder: "search…";
+                    text <=> PopupState.query;
+                    edited => {
+                        PopupState.query-edited();
+                    }
+                    accepted => {
+                        PopupState.field-copy(0);
+                    }
+                }
+                Text {
+                    text: PopupState.status;
+                    color: Palette.accent;
+                    vertical-alignment: center;
+                }
+            }
+            HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: Palette.gap * 1.5;
+                Panel {
+                    title: "entries";
+                    width: Palette.ch * 31;
+                    Flickable {
+                        content-height: PopupState.rows.length * Palette.row;
+                        for r[i] in PopupState.rows: Rectangle {
+                            y: i * Palette.row;
+                            height: Palette.row;
+                            width: parent.width;
+                            background: i == PopupState.selected ? Palette.sel-bg : transparent;
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: Palette.gap;
+                                Text {
+                                    text: i == PopupState.selected ? "▸" : " ";
+                                    color: Palette.accent;
+                                    vertical-alignment: center;
+                                }
+                                Text {
+                                    text: r.label == "" ? "(untitled)" : r.label;
+                                    color: r.label == "" ? Palette.dim : Palette.fg;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                            TouchArea {
+                                clicked => {
+                                    PopupState.select(i);
+                                }
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "fields";
+                    horizontal-stretch: 1;
+                    active: true;
+                    if PopupState.fields.length == 0: Text {
+                        text: PopupState.selected < 0 ? "no matches" : "no fields";
+                        color: Palette.dim;
+                    }
+                    Flickable {
+                        content-height: PopupState.fields.length * (Palette.row + 4px);
+                        for f[i] in PopupState.fields: HorizontalLayout {
+                            y: i * (Palette.row + 4px);
+                            width: parent.width;
+                            height: Palette.row;
+                            spacing: Palette.gap * 0.75;
+                            Text {
+                                text: (i < 4 ? "Ctrl+" + (i + 1) + "  " : "        ") + f.key;
+                                color: Palette.dim;
+                                width: Palette.ch * 22;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                            TInput {
+                                horizontal-stretch: 1;
+                                text: f.value;
+                                password: f.secret && f.hidden;
+                                edited => {
+                                    PopupState.field-edited(i, self.text);
+                                }
+                            }
+                            TBtn {
+                                label: "h";
+                                on: f.hidden;
+                                visible: f.secret;
+                                clicked => {
+                                    PopupState.field-toggle-hidden(i);
+                                }
+                            }
+                            TBtn {
+                                label: "c";
+                                clicked => {
+                                    PopupState.field-copy(i);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Text {
+                text: "type to search   ↑↓ entry   Enter copy first   Ctrl+1-4 copy field   Esc close";
+                color: Palette.dim;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+// Small always-on-top launcher for the quick list. Stands in for the tray icon
+// where there is no tray to click (e.g. WSL).
+export component MiniWindow inherits Window {
+    // Distinct title: the window-attributes hook (main.rs) keys off it.
+    title: "paddy launcher";
+    // Embedded at build time: Slint only hands images with a cache key to the window manager.
+    icon: @image-url("../../assets/icons/paddy-256.png");
+    // Fixed size: tiling window managers (i3, sway) float fixed-size windows
+    // instead of giving a 150 px button half the screen.
+    width: max(150px, Palette.ch * 13);
+    height: max(40px, Palette.row + 16px);
+    background: Palette.bg;
+    default-font-family: Palette.font;
+    default-font-size: Palette.fs;
+    always-on-top: true;
+    in property <bool> builtin-bar;
+    no-frame: root.builtin-bar;
+    callback clicked();
+    callback drag-window(length, length);
+    callback start-drag() -> bool;
+    property <bool> dragged;
+    property <bool> native-move;
+
+    Rectangle {
+        border-width: 1px;
+        border-color: ta.has-hover ? Palette.accent : Palette.line;
+        background: ta.has-hover ? Palette.sel-bg : transparent;
+        Text {
+            text: "▸ paddy";
+            color: Palette.accent;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        ta := TouchArea {
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down) {
+                    root.dragged = false;
+                    root.native-move = false;
+                }
+            }
+            moved => {
+                // Drag the button around; a small wiggle still counts as a click.
+                if (!root.dragged && abs(self.mouse-x - self.pressed-x) + abs(self.mouse-y - self.pressed-y) > 4px) {
+                    root.dragged = true;
+                    root.native-move = root.start-drag();
+                }
+                if (root.dragged && !root.native-move) {
+                    root.drag-window(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                }
+            }
+            clicked => {
+                if (!root.dragged) {
+                    root.clicked();
+                }
+            }
+        }
+    }
+}

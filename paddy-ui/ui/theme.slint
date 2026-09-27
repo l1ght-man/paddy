@@ -1,0 +1,26 @@
+// Colors and metrics. Every widget reads from here so the light/dark toggle
+// (milestone 3) is a single property flip.
+export global Palette {
+    in-out property <bool> dark: true;
+
+    // Colors come from the active theme (see paddy_core::Theme); Rust sets them.
+    in-out property <color> bg: #0a0b0b;
+    in-out property <color> panel: #0e100f;
+    in-out property <color> fg: #c5cac3;
+    in-out property <color> dim: #666d66;
+    in-out property <color> line: #2a302b;
+    in-out property <color> accent: #8caa89;
+    in-out property <color> sel-bg: #171d18;
+    in-out property <color> warn: #c98a6f;
+
+    // Look settings, set from Rust (config): family, size, and row density.
+    in-out property <string> font: "DejaVu Sans Mono";
+    in-out property <length> fs: 13px;
+    in-out property <float> row-scale: 1.7;
+    // Gap between elements; density scales it (compact / normal / roomy).
+    in-out property <float> gap-scale: 1.0;
+    out property <length> gap: 8px * gap-scale;
+    out property <length> row: fs * row-scale;
+    // Width of one character of the (monospace) font, for sizing columns.
+    out property <length> ch: fs * 0.6;
+}

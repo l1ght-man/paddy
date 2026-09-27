@@ -1,0 +1,14 @@
+# build output (also holds distro-test screenshots)
+/target/
+# local Claude Code settings (per machine)
+.claude/settings.local.json
+# editor / OS noise
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/
+# never commit vaults or configs by accident
+*.db
+*.db.tmp
+*.db-journal

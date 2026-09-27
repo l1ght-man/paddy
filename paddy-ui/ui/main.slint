@@ -1,0 +1,2041 @@
+import { Palette } from "theme.slint";
+import { AppState, Binding, EntryRow, FieldRow, FontRow, HelpRow, Hint, KeyRow, MdBlock, PackRow, PickRow, TemplateRow, VarRow } from "state.slint";
+import { Panel, TInput, NotesInput, TBtn, KeyHint, TabBtn, WinBtn, SettingRow, ShortcutRow, Logo } from "widgets.slint";
+import { QuickRow, PopupState, QuickWindow, MiniWindow } from "popup.slint";
+
+export { AppState, Binding, EntryRow, FieldRow, FontRow, PackRow, HelpRow, Hint, KeyRow, MdBlock, PickRow, Palette, TemplateRow, VarRow, QuickRow, PopupState, QuickWindow, MiniWindow }
+
+component EntryList inherits Panel {
+    title: "entries";
+    active: fs.has-focus;
+    public function focus-list() {
+        fs.focus();
+    }
+    public function ensure-visible(i: int) {
+        if (i >= 0) {
+            if (i * Palette.row < -lf.content-y) {
+                lf.content-y = -i * Palette.row;
+            } else if ((i + 1) * Palette.row > -lf.content-y + lf.height) {
+                lf.content-y = -((i + 1) * Palette.row - lf.height);
+            }
+        }
+    }
+    callback edit();
+    public function focus-search() {
+        search-in.focus-input();
+    }
+
+    VerticalLayout {
+        spacing: Palette.gap * 0.75;
+        FocusScope {
+            height: Palette.row;
+            KeyBinding {
+                keys: @keys(Escape);
+                activated => {
+                    AppState.search = "";
+                    AppState.search-edited();
+                    fs.focus();
+                }
+            }
+            HorizontalLayout {
+                spacing: Palette.gap * 0.75;
+                Text {
+                    text: "/";
+                    color: Palette.dim;
+                    vertical-alignment: center;
+                }
+                search-in := TInput {
+                    placeholder: "search this vault (Ctrl+F)";
+                    text <=> AppState.search;
+                    edited => {
+                        AppState.search-edited();
+                    }
+                    accepted => {
+                        fs.focus();
+                    }
+                }
+            }
+        }
+
+    fs := FocusScope {
+        KeyBinding {
+            keys: @keys(UpArrow);
+            activated => {
+                if (AppState.selected > 0) {
+                    AppState.select(AppState.selected - 1);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(DownArrow);
+            activated => {
+                if (AppState.selected < AppState.entries.length - 1) {
+                    AppState.select(AppState.selected + 1);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(Home);
+            activated => {
+                if (AppState.entries.length > 0) {
+                    AppState.select(0);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(End);
+            activated => {
+                if (AppState.entries.length > 0) {
+                    AppState.select(AppState.entries.length - 1);
+                }
+            }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            activated => {
+                root.edit();
+            }
+        }
+        KeyBinding {
+            keys: @keys("/");
+            activated => {
+                root.focus-search();
+            }
+        }
+
+        lf := Flickable {
+            content-height: AppState.entries.length * Palette.row;
+            for e[i] in AppState.entries: Rectangle {
+                y: i * Palette.row;
+                height: Palette.row;
+                width: parent.width;
+                background: i == AppState.selected ? Palette.sel-bg : transparent;
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    spacing: Palette.gap;
+                    Text {
+                        text: i == AppState.selected ? "▸" : " ";
+                        color: Palette.accent;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: e.label == "" ? "(untitled)" : e.label;
+                        color: e.label == "" ? Palette.dim : Palette.fg;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: e.tags;
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        max-width: Palette.ch * 12;
+                    }
+                }
+                TouchArea {
+                    clicked => {
+                        AppState.select(i);
+                        fs.focus();
+                    }
+                }
+            }
+        }
+    }
+    }
+}
+
+component FieldRowView inherits Rectangle {
+    in property <int> index;
+    in property <FieldRow> f;
+    height: Palette.row;
+
+    HorizontalLayout {
+        spacing: Palette.gap * 0.75;
+        key-in := TInput {
+            width: Palette.ch * 17;
+            placeholder: "key";
+            text: root.f.key;
+            edited => {
+                AppState.field-edited(root.index, self.text, val.text);
+            }
+            init => {
+                if (AppState.focus-field == root.index) {
+                    AppState.focus-field = -1;
+                    self.focus-input();
+                }
+            }
+        }
+        Text {
+            text: "=";
+            color: Palette.dim;
+            vertical-alignment: center;
+        }
+        val := TInput {
+            horizontal-stretch: 1;
+            placeholder: "value";
+            text: root.f.value;
+            password: root.f.secret && root.f.hidden;
+            edited => {
+                AppState.field-edited(root.index, key-in.text, self.text);
+            }
+        }
+        TBtn {
+            label: "s";
+            on: root.f.secret;
+            clicked => {
+                AppState.field-toggle-secret(root.index);
+            }
+        }
+        TBtn {
+            label: "h";
+            on: root.f.hidden;
+            visible: root.f.secret;
+            clicked => {
+                AppState.field-toggle-hidden(root.index);
+            }
+        }
+        TBtn {
+            label: "c";
+            clicked => {
+                AppState.field-copy(root.index);
+            }
+        }
+        TBtn {
+            label: "x";
+            tint: Palette.warn;
+            clicked => {
+                AppState.field-remove(root.index);
+            }
+        }
+    }
+}
+
+component MdBlockView inherits HorizontalLayout {
+    in property <MdBlock> b;
+    padding-left: b.kind == "li" ? b.level * Palette.ch * 2 : 0px;
+    spacing: Palette.ch;
+    if b.kind == "h": Text {
+        text: b.plain;
+        color: Palette.accent;
+        font-weight: 700;
+        font-size: b.level == 1 ? Palette.fs * 1.5 : (b.level == 2 ? Palette.fs * 1.25 : Palette.fs * 1.1);
+        wrap: word-wrap;
+        horizontal-stretch: 1;
+    }
+    if b.kind == "p": StyledText {
+        text: b.text;
+        default-color: Palette.fg;
+        default-font-size: Palette.fs;
+        link-color: Palette.accent;
+        horizontal-stretch: 1;
+        link-clicked(l) => {
+            AppState.md-link(l);
+        }
+    }
+    if b.kind == "li": Text {
+        text: b.marker;
+        color: Palette.accent;
+        vertical-alignment: top;
+        min-width: Palette.ch * 3;
+    }
+    if b.kind == "li": StyledText {
+        text: b.text;
+        default-color: Palette.fg;
+        default-font-size: Palette.fs;
+        link-color: Palette.accent;
+        horizontal-stretch: 1;
+        link-clicked(l) => {
+            AppState.md-link(l);
+        }
+    }
+    if b.kind == "quote": Rectangle {
+        width: 3px;
+        background: Palette.accent;
+    }
+    if b.kind == "quote": StyledText {
+        text: b.text;
+        default-color: Palette.dim;
+        default-font-size: Palette.fs;
+        link-color: Palette.accent;
+        horizontal-stretch: 1;
+    }
+    if b.kind == "code": Rectangle {
+        background: Palette.sel-bg;
+        horizontal-stretch: 1;
+        min-height: code-text.preferred-height + 8px;
+        code-text := Text {
+            x: 6px;
+            y: 4px;
+            width: parent.width - 12px;
+            text: b.plain;
+            color: Palette.fg;
+            wrap: word-wrap;
+        }
+    }
+    if b.kind == "rule": Rectangle {
+        height: Palette.row * 0.5;
+        horizontal-stretch: 1;
+        Rectangle {
+            y: parent.height / 2;
+            height: 1px;
+            background: Palette.line;
+        }
+    }
+    if b.kind == "gap": Rectangle {
+        height: Palette.fs * 0.5;
+    }
+}
+
+component MdView inherits Rectangle {
+    background: Palette.panel;
+    border-width: 1px;
+    border-color: Palette.line;
+    fl := Flickable {
+        x: 8px;
+        y: 6px;
+        width: parent.width - 16px;
+        height: parent.height - 12px;
+        content-height: col.preferred-height + 4px;
+        col := VerticalLayout {
+            y: 0;
+            width: fl.width;
+            height: self.preferred-height;
+            spacing: 3px;
+            for b in AppState.md-blocks: MdBlockView {
+                b: b;
+            }
+        }
+    }
+    if AppState.md-blocks.length == 0: Text {
+        text: "nothing to preview yet — write some markdown in the editor";
+        color: Palette.dim;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component EntryEditor inherits Panel {
+    title: "entry";
+    active: label-in.has-focus || tags-in.has-focus || notes-in.has-focus;
+    public function focus-label() {
+        label-in.focus-input();
+    }
+
+    Rectangle {
+        VerticalLayout {
+            visible: AppState.selected < 0;
+            alignment: center;
+            spacing: Palette.gap * 1.75;
+            HorizontalLayout {
+                alignment: center;
+                Logo {
+                    data: AppState.logo;
+                    cols: 24;
+                    rows: 22;
+                    tint: Palette.line;
+                }
+            }
+            Text {
+                text: "no entry selected — press Ctrl+N to add one";
+                color: Palette.dim;
+                horizontal-alignment: center;
+            }
+        }
+
+        VerticalLayout {
+        visible: AppState.selected >= 0;
+        width: parent.width;
+        height: parent.height;
+        spacing: Palette.gap;
+        HorizontalLayout {
+            spacing: Palette.gap;
+            Text {
+                text: "label";
+                color: Palette.dim;
+                width: Palette.ch * 7;
+                vertical-alignment: center;
+            }
+            label-in := TInput {
+                text <=> AppState.draft-label;
+                placeholder: "name of this entry";
+                edited => {
+                    AppState.draft-edited();
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: Palette.gap;
+            Text {
+                text: "tags";
+                color: Palette.dim;
+                width: Palette.ch * 7;
+                vertical-alignment: center;
+            }
+            tags-in := TInput {
+                text <=> AppState.draft-tags;
+                placeholder: "comma, separated";
+                edited => {
+                    AppState.draft-edited();
+                }
+            }
+        }
+        HorizontalLayout {
+            Text {
+                text: "── fields ──";
+                color: Palette.dim;
+                horizontal-stretch: 1;
+            }
+            TBtn {
+                label: "+ field";
+                clicked => {
+                    AppState.field-add();
+                }
+            }
+        }
+        Flickable {
+            vertical-stretch: 1;
+            min-height: 60px;
+            content-height: AppState.draft-fields.length * (Palette.row + 4px);
+            for f[i] in AppState.draft-fields: FieldRowView {
+                y: i * (Palette.row + 4px);
+                width: parent.width;
+                index: i;
+                f: f;
+            }
+        }
+        HorizontalLayout {
+            spacing: Palette.gap * 0.75;
+            Text {
+                text: "── notes (markdown) ──";
+                color: Palette.dim;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            TBtn {
+                label: "edit";
+                on: !AppState.notes-preview;
+                clicked => {
+                    if (AppState.notes-preview) {
+                        AppState.toggle-preview();
+                    }
+                }
+            }
+            TBtn {
+                label: "preview";
+                on: AppState.notes-preview;
+                clicked => {
+                    if (!AppState.notes-preview) {
+                        AppState.toggle-preview();
+                    }
+                }
+            }
+            TBtn {
+                label: "copy";
+                clicked => {
+                    AppState.copy-notes();
+                }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 60px;
+            notes-in := NotesInput {
+                width: parent.width;
+                height: parent.height;
+                visible: !AppState.notes-preview;
+                text <=> AppState.draft-notes;
+                edited => {
+                    AppState.draft-edited();
+                }
+            }
+            if AppState.notes-preview: MdView {
+                width: parent.width;
+                height: parent.height;
+            }
+        }
+        }
+    }
+}
+
+component Overlay inherits Rectangle {
+    // Dim backdrop that swallows clicks.
+    background: Palette.bg.with-alpha(0.8);
+    TouchArea { }
+}
+
+component ConfirmDelete inherits Overlay {
+    FocusScope {
+        // Overlays sit outside the main key scope, so they carry the shared shortcuts too
+        // (Rust decides which actions may run while a dialog is open).
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        init => {
+            self.focus();
+        }
+        KeyBinding {
+            keys: @keys("y");
+            activated => {
+                AppState.delete-entry();
+            }
+        }
+        KeyBinding {
+            keys: @keys("n");
+            activated => {
+                AppState.cancel-delete();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                AppState.cancel-delete();
+            }
+        }
+    }
+
+    Panel {
+        title: "delete";
+        active: true;
+        width: Palette.ch * 60;
+        height: Palette.row * 6;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        VerticalLayout {
+            spacing: Palette.gap * 1.75;
+            Text {
+                text: "Delete “" + (AppState.draft-label == "" ? "(untitled)" : AppState.draft-label) + "” permanently?";
+                color: Palette.fg;
+                wrap: word-wrap;
+            }
+            Text {
+                text: "there is no undo and no trash.";
+                color: Palette.warn;
+            }
+            Text {
+                text: "Y  delete        N or Esc  keep";
+                color: Palette.accent;
+            }
+        }
+    }
+}
+
+component TemplatesOverlay inherits Overlay {
+    FocusScope {
+        // Overlays sit outside the main key scope, so they carry the shared shortcuts too
+        // (Rust decides which actions may run while a dialog is open).
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                AppState.close-templates();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Control + Return);
+            activated => {
+                AppState.tpl-copy();
+            }
+        }
+
+        Panel {
+            title: "templates";
+            active: true;
+            width: min(parent.width - 60px, 900px);
+            height: min(parent.height - 60px, 520px);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            HorizontalLayout {
+                spacing: Palette.gap * 1.75;
+                // template list
+                VerticalLayout {
+                    width: Palette.ch * 27;
+                    spacing: Palette.gap;
+                    tl := FocusScope {
+                        vertical-stretch: 1;
+                        init => {
+                            self.focus();
+                        }
+                        // keep the highlighted template on screen while arrowing
+                        property <int> sel: AppState.tpl-selected;
+                        changed sel => {
+                            if (self.sel >= 0) {
+                                if (self.sel * Palette.row < -tpl-list.content-y) {
+                                    tpl-list.content-y = -self.sel * Palette.row;
+                                } else if ((self.sel + 1) * Palette.row > -tpl-list.content-y + tpl-list.height) {
+                                    tpl-list.content-y = -((self.sel + 1) * Palette.row - tpl-list.height);
+                                }
+                            }
+                        }
+                        KeyBinding {
+                            keys: @keys(UpArrow);
+                            activated => {
+                                if (AppState.tpl-selected > 0) {
+                                    AppState.tpl-select(AppState.tpl-selected - 1);
+                                }
+                            }
+                        }
+                        KeyBinding {
+                            keys: @keys(DownArrow);
+                            activated => {
+                                if (AppState.tpl-selected < AppState.templates.length - 1) {
+                                    AppState.tpl-select(AppState.tpl-selected + 1);
+                                }
+                            }
+                        }
+                        // Scrolls: a template pack adds dozens of rows.
+                        tpl-list := Flickable {
+                            content-height: AppState.templates.length * Palette.row;
+                            for t[i] in AppState.templates: Rectangle {
+                                y: i * Palette.row;
+                                width: parent.width;
+                                height: Palette.row;
+                                background: i == AppState.tpl-selected ? Palette.sel-bg : transparent;
+                                Text {
+                                    x: 6px;
+                                    text: (i == AppState.tpl-selected ? "▸ " : "  ") + t.name;
+                                    color: i == AppState.tpl-selected ? Palette.accent : Palette.fg;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    width: parent.width - 12px;
+                                }
+                                TouchArea {
+                                    clicked => {
+                                        AppState.tpl-select(i);
+                                        tl.focus();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: Palette.gap * 0.5;
+                        TBtn {
+                            label: "+ new";
+                            clicked => {
+                                AppState.tpl-new();
+                            }
+                        }
+                        TBtn {
+                            label: "delete";
+                            tint: Palette.warn;
+                            clicked => {
+                                AppState.tpl-delete();
+                            }
+                        }
+                    }
+                }
+                // editor + fill-in
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: Palette.gap;
+                    if AppState.tpl-selected < 0: Text {
+                        text: "no template — add one with [+ new]";
+                        color: Palette.dim;
+                    }
+                    if AppState.tpl-selected >= 0: VerticalLayout {
+                        spacing: Palette.gap;
+                        HorizontalLayout {
+                            spacing: Palette.gap;
+                            Text {
+                                text: "name";
+                                color: Palette.dim;
+                                width: Palette.ch * 8;
+                                vertical-alignment: center;
+                            }
+                            TInput {
+                                text <=> AppState.tpl-name;
+                                edited => {
+                                    AppState.tpl-edited();
+                                }
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: Palette.gap;
+                            Text {
+                                text: "pattern";
+                                color: Palette.dim;
+                                width: Palette.ch * 8;
+                                vertical-alignment: center;
+                            }
+                            TInput {
+                                text <=> AppState.tpl-pattern;
+                                placeholder: "ssh {user}@{host} -p {port}";
+                                edited => {
+                                    AppState.tpl-edited();
+                                }
+                            }
+                        }
+                        Text {
+                            text: "── fill in (values come from the selected entry) ──";
+                            color: Palette.dim;
+                        }
+                        for v[i] in AppState.tpl-vars: HorizontalLayout {
+                            spacing: Palette.gap;
+                            Text {
+                                text: v.name;
+                                color: Palette.accent;
+                                width: Palette.ch * 14;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                            TInput {
+                                text: v.value;
+                                placeholder: "…";
+                                edited => {
+                                    AppState.tpl-var-edited(i, self.text);
+                                }
+                                accepted => {
+                                    AppState.tpl-copy();
+                                }
+                            }
+                        }
+                        Rectangle { }
+                        Text {
+                            text: "── result ──";
+                            color: Palette.dim;
+                        }
+                        Text {
+                            text: AppState.tpl-preview;
+                            color: Palette.fg;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: "Enter or Ctrl+Enter copy   Tab next field   Esc close";
+                            color: Palette.dim;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Generic "type to filter, arrows to pick, enter to accept" overlay (Obsidian-style).
+component Picker inherits Overlay {
+    in property <string> title;
+    in property <string> hint;
+    in-out property <string> query;
+    in property <[PickRow]> rows;
+    in-out property <int> selected;
+    in property <string> preview;
+    in property <string> placeholder;
+    callback edited();
+    callback select(int);
+    callback chosen();
+    callback close();
+
+    // Keep the highlighted row on screen while arrowing through a long list.
+    changed selected => {
+        if (root.selected >= 0) {
+            if (root.selected * Palette.row * 2 < -lst.content-y) {
+                lst.content-y = -root.selected * Palette.row * 2;
+            } else if ((root.selected + 1) * Palette.row * 2 > -lst.content-y + lst.height) {
+                lst.content-y = -((root.selected + 1) * Palette.row * 2 - lst.height);
+            }
+        }
+    }
+
+    FocusScope {
+        // Overlays sit outside the main key scope, so they carry the shared shortcuts too
+        // (Rust decides which actions may run while a dialog is open).
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        capture-key-pressed(e) => {
+            if (e.text == Key.UpArrow) {
+                if (root.selected > 0) {
+                    root.select(root.selected - 1);
+                }
+                return accept;
+            }
+            if (e.text == Key.DownArrow) {
+                if (root.selected < root.rows.length - 1) {
+                    root.select(root.selected + 1);
+                }
+                return accept;
+            }
+            if (e.text == Key.Escape) {
+                root.close();
+                return accept;
+            }
+            reject
+        }
+
+        Panel {
+            title: root.title;
+            active: true;
+            width: min(parent.width - 60px, root.preview != "" ? 900px : 560px);
+            height: min(parent.height - 60px, 460px);
+            x: (parent.width - self.width) / 2;
+            y: max(30px, (parent.height - self.height) / 3);
+            VerticalLayout {
+                spacing: Palette.gap;
+                HorizontalLayout {
+                    spacing: Palette.gap;
+                    Text {
+                        text: "▸";
+                        color: Palette.accent;
+                        vertical-alignment: center;
+                    }
+                    qi := TInput {
+                        placeholder: root.placeholder;
+                        text <=> root.query;
+                        init => {
+                            self.focus-input();
+                        }
+                        edited => {
+                            root.edited();
+                        }
+                        accepted => {
+                            root.chosen();
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    vertical-stretch: 1;
+                    spacing: Palette.gap * 1.75;
+                    lst := Flickable {
+                        content-height: root.rows.length * Palette.row * 2;
+                        for r[i] in root.rows: Rectangle {
+                            y: i * Palette.row * 2;
+                            height: Palette.row * 2;
+                            width: parent.width;
+                            background: i == root.selected ? Palette.sel-bg : transparent;
+                            VerticalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                Text {
+                                    text: (i == root.selected ? "▸ " : "  ") + r.primary;
+                                    color: i == root.selected ? Palette.accent : Palette.fg;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                    height: Palette.row;
+                                }
+                                Text {
+                                    text: "  " + r.secondary;
+                                    color: Palette.dim;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                    height: Palette.row;
+                                }
+                            }
+                            TouchArea {
+                                clicked => {
+                                    root.select(i);
+                                }
+                                double-clicked => {
+                                    root.select(i);
+                                    root.chosen();
+                                }
+                            }
+                        }
+                        if root.rows.length == 0: Text {
+                            text: "nothing matches";
+                            color: Palette.dim;
+                        }
+                    }
+                    if root.preview != "": Rectangle {
+                        width: Palette.ch * 52;
+                        Text {
+                            x: 0;
+                            y: 0;
+                            width: parent.width;
+                            height: parent.height;
+                            text: root.preview;
+                            color: Palette.fg;
+                            wrap: word-wrap;
+                            vertical-alignment: top;
+                            overflow: elide;
+                        }
+                    }
+                }
+                Text {
+                    text: root.hint;
+                    color: Palette.dim;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+component VaultsOverlay inherits Picker {
+    title: "vaults";
+    placeholder: "switch to a vault, or type a new name to create one";
+    hint: "↑↓ pick   ⏎ open / create   esc close";
+    query <=> AppState.vs-query;
+    rows: AppState.vs-rows;
+    selected: AppState.vs-selected;
+    edited => {
+        AppState.vs-edited();
+    }
+    select(i) => {
+        AppState.vs-select(i);
+    }
+    chosen => {
+        AppState.vs-open();
+    }
+    close => {
+        AppState.close-vaults();
+    }
+}
+
+component GlobalOverlay inherits Picker {
+    title: "search all vaults";
+    placeholder: "search every vault…";
+    hint: "↑↓ pick   ⏎ open entry   esc close";
+    query <=> AppState.gs-query;
+    rows: AppState.gs-rows;
+    selected: AppState.gs-selected;
+    preview: AppState.gs-preview;
+    edited => {
+        AppState.gs-edited();
+    }
+    select(i) => {
+        AppState.gs-select(i);
+    }
+    chosen => {
+        AppState.gs-open();
+    }
+    close => {
+        AppState.close-global();
+    }
+}
+
+component SettingsPage inherits Rectangle {
+    background: Palette.bg;
+    property <int> refocus: AppState.focus-page;
+    changed refocus => {
+        // never pull focus out of a dialog that opened in the meantime
+        if (!AppState.overlay-open) {
+            page-focus.focus();
+        }
+    }
+    page-focus := FocusScope {
+        init => {
+            self.focus();
+        }
+        fl := Flickable {
+            content-height: inner.preferred-height + 12px;
+            inner := HorizontalLayout {
+                y: 10px;
+                width: fl.width;
+                height: self.preferred-height;
+                spacing: Palette.gap * 1.75;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    spacing: Palette.gap * 1.75;
+                    Panel {
+                        title: "appearance";
+                        SettingRow {
+                            label: "theme";
+                            Text {
+                                text: AppState.theme-name;
+                                color: Palette.fg;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            TBtn {
+                                label: "choose…";
+                                clicked => {
+                                    AppState.open-themes();
+                                }
+                            }
+                        }
+                        SettingRow {
+                            label: "animations";
+                            TBtn {
+                                label: AppState.anim-on ? "on" : "off";
+                                on: AppState.anim-on;
+                                clicked => {
+                                    AppState.toggle-anim();
+                                }
+                            }
+                            Text {
+                                text: "only on save/open, never while idle";
+                                color: Palette.dim;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+                    Panel {
+                        title: "text";
+                        SettingRow {
+                            label: "font";
+                            Text {
+                                text: AppState.font-name;
+                                color: Palette.fg;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            TBtn {
+                                label: "change";
+                                clicked => {
+                                    AppState.open-fonts();
+                                }
+                            }
+                        }
+                        SettingRow {
+                            label: "size";
+                            TBtn {
+                                label: "–";
+                                clicked => {
+                                    AppState.bump-font-size(-1);
+                                }
+                            }
+                            Text {
+                                text: AppState.font-size-px + " px";
+                                color: Palette.fg;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                                min-width: Palette.ch * 6;
+                            }
+                            TBtn {
+                                label: "+";
+                                clicked => {
+                                    AppState.bump-font-size(1);
+                                }
+                            }
+                            TBtn {
+                                label: "reset";
+                                clicked => {
+                                    AppState.reset-font-size();
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        SettingRow {
+                            label: "spacing";
+                            TBtn {
+                                label: "compact";
+                                on: AppState.density-mode == "compact";
+                                clicked => {
+                                    AppState.set-density("compact");
+                                }
+                            }
+                            TBtn {
+                                label: "normal";
+                                on: AppState.density-mode == "normal";
+                                clicked => {
+                                    AppState.set-density("normal");
+                                }
+                            }
+                            TBtn {
+                                label: "roomy";
+                                on: AppState.density-mode == "roomy";
+                                clicked => {
+                                    AppState.set-density("roomy");
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        Text {
+                            text: "shortcuts for size are on the keys tab";
+                            color: Palette.dim;
+                            wrap: word-wrap;
+                        }
+                    }
+                    Panel {
+                        title: "privacy";
+                        SettingRow {
+                            label: "clipboard";
+                            TBtn {
+                                label: "off";
+                                on: AppState.clip-secs == 0;
+                                clicked => {
+                                    AppState.set-clip-secs(0);
+                                }
+                            }
+                            TBtn {
+                                label: "15 s";
+                                on: AppState.clip-secs == 15;
+                                clicked => {
+                                    AppState.set-clip-secs(15);
+                                }
+                            }
+                            TBtn {
+                                label: "30 s";
+                                on: AppState.clip-secs == 30;
+                                clicked => {
+                                    AppState.set-clip-secs(30);
+                                }
+                            }
+                            TBtn {
+                                label: "60 s";
+                                on: AppState.clip-secs == 60;
+                                clicked => {
+                                    AppState.set-clip-secs(60);
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        Text {
+                            text: "A copied secret field (or a template that contains one) is removed from the clipboard after this long, unless you copied something else meanwhile.";
+                            color: Palette.dim;
+                            wrap: word-wrap;
+                        }
+                    }
+                    Panel {
+                        title: "window";
+                        SettingRow {
+                            label: "title bar";
+                            TBtn {
+                                label: "auto";
+                                on: AppState.window-bar-mode == "auto";
+                                clicked => {
+                                    AppState.set-window-bar("auto");
+                                }
+                            }
+                            TBtn {
+                                label: "built-in";
+                                on: AppState.window-bar-mode == "builtin";
+                                clicked => {
+                                    AppState.set-window-bar("builtin");
+                                }
+                            }
+                            TBtn {
+                                label: "native";
+                                on: AppState.window-bar-mode == "native";
+                                clicked => {
+                                    AppState.set-window-bar("native");
+                                }
+                            }
+                            Rectangle { }
+                        }
+                        Text {
+                            text: "built-in draws paddy's own bar (drag, minimize, maximize, close). auto uses it on WSL, where the native one is unreliable.";
+                            color: Palette.dim;
+                            wrap: word-wrap;
+                        }
+                    }
+                    Panel {
+                        title: "quick list";
+                        SettingRow {
+                            label: "hotkey";
+                            TInput {
+                                text <=> AppState.settings-hotkey;
+                                placeholder: "ctrl+alt+p";
+                                accepted => {
+                                    AppState.apply-hotkey();
+                                }
+                            }
+                            TBtn {
+                                label: "apply";
+                                clicked => {
+                                    AppState.apply-hotkey();
+                                }
+                            }
+                        }
+                        SettingRow {
+                            label: "floating button";
+                            TBtn {
+                                label: AppState.mini-on ? "shown" : "hidden";
+                                on: AppState.mini-on;
+                                clicked => {
+                                    AppState.toggle-mini();
+                                }
+                            }
+                            Text {
+                                text: "opens the quick list; handy with no tray";
+                                color: Palette.dim;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                        Text {
+                            text: AppState.settings-note;
+                            color: Palette.accent;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    spacing: Palette.gap * 1.75;
+                    Panel {
+                        title: "about";
+                        HorizontalLayout {
+                            spacing: Palette.gap * 2.25;
+                            Logo {
+                                data: AppState.logo;
+                                cols: 24;
+                                rows: 22;
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: Palette.gap * 0.5;
+                                Text {
+                                    text: "paddy";
+                                    color: Palette.accent;
+                                    font-weight: 700;
+                                }
+                                Text {
+                                    text: AppState.about-text;
+                                    color: Palette.dim;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                    Panel {
+                        title: "files";
+                        Text {
+                            text: "settings file";
+                            color: Palette.dim;
+                        }
+                        HorizontalLayout {
+                            spacing: Palette.gap;
+                            Text {
+                                text: AppState.config-path;
+                                color: Palette.fg;
+                                overflow: elide;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+                            TBtn {
+                                label: "copy";
+                                clicked => {
+                                    AppState.copy-path(AppState.config-path);
+                                }
+                            }
+                        }
+                        Text {
+                            text: "vaults folder";
+                            color: Palette.dim;
+                        }
+                        HorizontalLayout {
+                            spacing: Palette.gap;
+                            Text {
+                                text: AppState.vaults-path;
+                                color: Palette.fg;
+                                overflow: elide;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+                            TBtn {
+                                label: "copy";
+                                clicked => {
+                                    AppState.copy-path(AppState.vaults-path);
+                                }
+                            }
+                        }
+                    }
+                    Panel {
+                        title: "resources (this app)";
+                        Text {
+                            text: AppState.diag-text;
+                            color: Palette.fg;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: "refreshes every 2s while this tab is open";
+                            color: Palette.dim;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component HelpOverlay inherits Overlay {
+    FocusScope {
+        // Overlays sit outside the main key scope, so they carry the shared shortcuts too
+        // (Rust decides which actions may run while a dialog is open).
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        init => {
+            self.focus();
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                AppState.close-help();
+            }
+        }
+        Panel {
+            title: "keyboard shortcuts";
+            active: true;
+            width: min(parent.width - 60px, 860px);
+            height: min(parent.height - 60px, 470px);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 3;
+            HorizontalLayout {
+                spacing: Palette.gap * 3.75;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    for r in AppState.help-left: HorizontalLayout {
+                        height: Palette.row;
+                        if r.header: Text {
+                            text: r.what;
+                            color: Palette.dim;
+                            vertical-alignment: bottom;
+                        }
+                        if !r.header: ShortcutRow {
+                            keys: r.keys;
+                            what: r.what;
+                        }
+                    }
+                    Rectangle { }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    for r in AppState.help-right: HorizontalLayout {
+                        height: Palette.row;
+                        if r.header: Text {
+                            text: r.what;
+                            color: Palette.dim;
+                            vertical-alignment: bottom;
+                        }
+                        if !r.header: ShortcutRow {
+                            keys: r.keys;
+                            what: r.what;
+                        }
+                    }
+                    Rectangle { }
+                }
+            }
+        }
+    }
+}
+
+component KeysPage inherits Rectangle {
+    background: Palette.bg;
+    property <int> refocus: AppState.focus-page;
+    changed refocus => {
+        // never pull focus out of a dialog that opened in the meantime
+        if (!AppState.overlay-open) {
+            page-focus.focus();
+        }
+    }
+    page-focus := FocusScope {
+        init => {
+            self.focus();
+        }
+        // While recording, the next chord is captured (before any shortcut can fire).
+        capture-key-pressed(e) => {
+            if (AppState.recording != "") {
+                AppState.record-key(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta);
+                return accept;
+            }
+            reject
+        }
+        Panel {
+            title: "keyboard shortcuts";
+            active: AppState.recording != "";
+            VerticalLayout {
+                spacing: Palette.gap * 0.75;
+                Text {
+                    text: AppState.recording != "" ? "press the new shortcut for “" + AppState.recording-label + "”   ·   Esc cancels" : "click [change] to record a new shortcut, [add] for a second one. Esc, Enter and the arrow keys are fixed.";
+                    color: AppState.recording != "" ? Palette.accent : Palette.dim;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: AppState.keys-note;
+                    color: Palette.warn;
+                    wrap: word-wrap;
+                }
+                Flickable {
+                    vertical-stretch: 1;
+                    content-height: krows.preferred-height + 4px;
+                    krows := VerticalLayout {
+                        y: 0;
+                        width: parent.width;
+                        height: self.preferred-height;
+                        spacing: 2px;
+                        for r in AppState.key-rows: HorizontalLayout {
+                            height: Palette.row;
+                            spacing: Palette.gap;
+                            if r.header: Text {
+                                text: r.label;
+                                color: Palette.dim;
+                                vertical-alignment: bottom;
+                            }
+                            if !r.header: Text {
+                                text: r.label;
+                                color: AppState.recording == r.id ? Palette.accent : Palette.fg;
+                                width: Palette.ch * 26;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                            if !r.header: Text {
+                                text: r.chords;
+                                color: r.is-default ? Palette.dim : Palette.accent;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            if !r.header: TBtn {
+                                label: "change";
+                                on: AppState.recording == r.id;
+                                clicked => {
+                                    AppState.key-change(r.id);
+                                }
+                            }
+                            if !r.header: TBtn {
+                                label: "add";
+                                clicked => {
+                                    AppState.key-add(r.id);
+                                }
+                            }
+                            if !r.header: TBtn {
+                                label: "clear";
+                                clicked => {
+                                    AppState.key-clear(r.id);
+                                }
+                            }
+                            if !r.header: TBtn {
+                                label: "reset";
+                                tint: r.is-default ? Palette.line : Palette.dim;
+                                clicked => {
+                                    AppState.key-reset(r.id);
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: Palette.gap;
+                    TBtn {
+                        label: "reset all to defaults";
+                        clicked => {
+                            AppState.keys-reset-all();
+                        }
+                    }
+                    Text {
+                        text: "or edit the settings file:  key.save = ctrl+s";
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ThemesOverlay inherits Picker {
+    title: "theme";
+    placeholder: "filter themes…";
+    hint: "↑↓ preview live   Enter keep   Esc cancel";
+    query <=> AppState.tp-query;
+    rows: AppState.tp-rows;
+    selected: AppState.tp-selected;
+    edited => {
+        AppState.tp-edited();
+    }
+    select(i) => {
+        AppState.tp-select(i);
+    }
+    chosen => {
+        AppState.tp-open();
+    }
+    close => {
+        AppState.close-themes();
+    }
+}
+
+// "Do you want to import this?" dialog for things fetched from a URL.
+component ImportOverlay inherits Overlay {
+    FocusScope {
+        init => {
+            self.focus();
+        }
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            activated => {
+                AppState.import-yes();
+            }
+        }
+        KeyBinding {
+            keys: @keys(Escape);
+            activated => {
+                AppState.import-no();
+            }
+        }
+        Panel {
+            title: AppState.import-title;
+            active: true;
+            width: min(parent.width - 60px, 720px);
+            height: min(parent.height - 60px, 360px);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 3;
+            VerticalLayout {
+                spacing: Palette.gap * 1.5;
+                Text {
+                    text: AppState.import-body;
+                    color: Palette.fg;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+                Text {
+                    text: "Nothing is saved until you press Enter. It is plain data and is never run.";
+                    color: Palette.dim;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    spacing: Palette.gap * 2;
+                    TBtn {
+                        label: "import (Enter)";
+                        clicked => {
+                            AppState.import-yes();
+                        }
+                    }
+                    TBtn {
+                        label: "cancel (Esc)";
+                        clicked => {
+                            AppState.import-no();
+                        }
+                    }
+                    Rectangle { }
+                }
+            }
+        }
+    }
+}
+
+component PacksPage inherits Rectangle {
+    background: Palette.bg;
+    property <int> refocus: AppState.focus-page;
+    changed refocus => {
+        // never pull focus out of a dialog that opened in the meantime
+        if (!AppState.overlay-open) {
+            page-focus.focus();
+        }
+    }
+    page-focus := FocusScope {
+        init => {
+            self.focus();
+        }
+        fl := Flickable {
+            content-height: inner.preferred-height + 12px;
+            inner := VerticalLayout {
+                y: 10px;
+                width: fl.width;
+                height: self.preferred-height;
+                spacing: Palette.gap * 1.75;
+                Panel {
+                    title: "themes";
+                    SettingRow {
+                        label: "current";
+                        Text {
+                            text: AppState.theme-name;
+                            color: Palette.fg;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        TBtn {
+                            label: "choose…";
+                            clicked => {
+                                AppState.open-themes();
+                            }
+                        }
+                    }
+                    Text {
+                        text: "12 themes are built in and work offline. Themes are plain color files: put your own in the themes folder, or import one from a URL below.";
+                        color: Palette.dim;
+                        wrap: word-wrap;
+                    }
+                }
+                Panel {
+                    title: "import from a URL";
+                    SettingRow {
+                        label: "https://";
+                        TInput {
+                            text <=> AppState.import-url;
+                            placeholder: "link to a .theme or template pack file";
+                            accepted => {
+                                AppState.import-templates-url();
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: Palette.gap;
+                        TBtn {
+                            label: "fetch as theme";
+                            clicked => {
+                                AppState.import-theme-url();
+                            }
+                        }
+                        TBtn {
+                            label: "fetch as template pack";
+                            clicked => {
+                                AppState.import-templates-url();
+                            }
+                        }
+                        Text {
+                            text: AppState.net-busy ? "  downloading…" : "";
+                            color: Palette.accent;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { }
+                    }
+                    Text {
+                        text: "https only · size-limited · public servers only · you see what it is and confirm before anything is saved.";
+                        color: Palette.dim;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: AppState.net-note;
+                        color: Palette.accent;
+                        wrap: word-wrap;
+                    }
+                }
+                Panel {
+                    title: "fonts";
+                    for f in AppState.pk-fonts: HorizontalLayout {
+                        height: Palette.row;
+                        spacing: Palette.gap;
+                        Text {
+                            text: (f.active ? "▸ " : "  ") + f.family;
+                            color: f.active ? Palette.accent : Palette.fg;
+                            width: Palette.ch * 22;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: f.license + "  ·  " + f.size;
+                            color: Palette.dim;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        TBtn {
+                            label: f.installed ? "use" : "download";
+                            on: f.active;
+                            clicked => {
+                                if (f.installed) {
+                                    AppState.font-use(f.id);
+                                } else {
+                                    AppState.font-install(f.id);
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        text: "Downloaded from each font's official project and checked against a built-in checksum, so a tampered file is rejected. Use the font picker in Settings for fonts already on your system.";
+                        color: Palette.dim;
+                        wrap: word-wrap;
+                    }
+                }
+                Panel {
+                    title: "template packs";
+                    for p in AppState.pk-packs: HorizontalLayout {
+                        height: Palette.row;
+                        spacing: Palette.gap;
+                        Text {
+                            text: p.name + "  (" + p.count + ")";
+                            color: Palette.fg;
+                            width: Palette.ch * 34;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: p.detail;
+                            color: Palette.dim;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        TBtn {
+                            label: "add to this vault";
+                            clicked => {
+                                AppState.pack-add(p.id);
+                            }
+                        }
+                    }
+                    Text {
+                        text: "Built in, so they work offline. Already-present templates are skipped, so adding twice is harmless. Open them with Ctrl+T.";
+                        color: Palette.dim;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FontsOverlay inherits Picker {
+    title: "font";
+    placeholder: "filter fonts…";
+    hint: "↑↓ preview live   Enter keep   Esc cancel";
+    query <=> AppState.fp-query;
+    rows: AppState.fp-rows;
+    selected: AppState.fp-selected;
+    edited => {
+        AppState.fp-edited();
+    }
+    select(i) => {
+        AppState.fp-select(i);
+    }
+    chosen => {
+        AppState.fp-open();
+    }
+    close => {
+        AppState.close-fonts();
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "paddy";
+    // Embedded at build time: Slint only hands images with a cache key to the window manager.
+    icon: @image-url("../../assets/icons/paddy-256.png");
+    preferred-width: 1000px;
+    preferred-height: 640px;
+    // Fixed: changing the font size must never resize the window.
+    min-width: 780px;
+    min-height: 460px;
+    background: Palette.bg;
+    default-font-family: Palette.font;
+    default-font-size: Palette.fs;
+    no-frame: AppState.builtin-bar;
+
+    // Built-in title bar plumbing (Rust moves/resizes the real window).
+    callback drag-window(length, length);
+    callback resize-window(length, length);
+    // Ask the window manager to run the move / resize (works on X11 and Wayland).
+    // Returns false where that isn't available; the manual fallback above is used then.
+    callback start-drag() -> bool;
+    callback start-resize() -> bool;
+    property <bool> native-move;
+    callback minimize-window();
+    callback toggle-maximize();
+    callback close-window();
+
+    public function focus-label() {
+        editor.focus-label();
+    }
+    public function focus-list() {
+        list.focus-list();
+    }
+    public function focus-search() {
+        list.focus-search();
+    }
+
+    property <int> selected: AppState.selected;
+    changed selected => {
+        list.ensure-visible(self.selected);
+    }
+
+    root-scope := FocusScope {
+        init => {
+            list.focus-list();
+        }
+        // Every remappable shortcut: built from the keymap (settings file / keys tab).
+        for b in AppState.bindings: KeyBinding {
+            keys: b.keys;
+            activated => {
+                AppState.run-action(b.action);
+            }
+        }
+        // Structural key, not remappable.
+        KeyBinding {
+            keys: @keys(Escape);
+            enabled: !AppState.overlay-open;
+            activated => {
+                if (AppState.tab != 0) {
+                    AppState.close-settings();
+                }
+                list.focus-list();
+            }
+        }
+
+        VerticalLayout {
+            padding: Palette.gap * 1.5;
+            padding-top: AppState.builtin-bar ? 0px : 12px;
+            spacing: Palette.gap * 1.5;
+
+            // Header: title, tabs, status, and (built-in bar) window buttons.
+            Rectangle {
+                height: max(34px, Palette.row + 12px);
+                vertical-stretch: 0;
+                // Empty header space drags the window when the built-in bar is on.
+                TouchArea {
+                    enabled: AppState.builtin-bar;
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.down) {
+                            root.native-move = false;
+                        }
+                    }
+                    moved => {
+                        // Hand the drag to the window manager on the first movement (so a
+                        // plain double-click still maximizes); fall back to moving ourselves.
+                        if (!root.native-move) {
+                            root.native-move = root.start-drag();
+                        }
+                        if (!root.native-move) {
+                            root.drag-window(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                        }
+                    }
+                    double-clicked => {
+                        root.toggle-maximize();
+                    }
+                }
+                HorizontalLayout {
+                    spacing: Palette.gap * 1.25;
+                    VerticalLayout {
+                        alignment: center;
+                        Logo {
+                            data: AppState.logo-mini;
+                            cols: 8;
+                            rows: 4;
+                            unit: 7px;
+                        }
+                    }
+                    Text {
+                        text: "paddy";
+                        color: Palette.accent;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: "▸ " + AppState.vault-name;
+                        color: Palette.fg;
+                        vertical-alignment: center;
+                    }
+                    Rectangle {
+                        width: 8px;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        TabBtn {
+                            height: Palette.row + 4px;
+                            label: "entries";
+                            active: AppState.tab == 0;
+                            clicked => {
+                                AppState.close-settings();
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        TabBtn {
+                            height: Palette.row + 4px;
+                            label: "keys";
+                            active: AppState.tab == 2;
+                            clicked => {
+                                AppState.open-keys();
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        TabBtn {
+                            height: Palette.row + 4px;
+                            label: "packs";
+                            active: AppState.tab == 3;
+                            clicked => {
+                                AppState.open-packs();
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        TabBtn {
+                            height: Palette.row + 4px;
+                            label: "settings";
+                            active: AppState.tab == 1;
+                            clicked => {
+                                AppState.open-settings();
+                            }
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: AppState.status;
+                        color: AppState.status-error ? Palette.warn : Palette.accent;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: AppState.dirty ? "● unsaved" : "○ saved";
+                        color: AppState.dirty ? Palette.warn : Palette.dim;
+                        vertical-alignment: center;
+                    }
+                    if AppState.builtin-bar: HorizontalLayout {
+                        spacing: 2px;
+                        WinBtn {
+                            glyph: "–";
+                            clicked => {
+                                root.minimize-window();
+                            }
+                        }
+                        WinBtn {
+                            glyph: "□";
+                            clicked => {
+                                root.toggle-maximize();
+                            }
+                        }
+                        WinBtn {
+                            glyph: "×";
+                            hover: Palette.warn.with-alpha(0.35);
+                            clicked => {
+                                root.close-window();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Body: entries view, with the settings page stacked on top when that tab is open.
+            Rectangle {
+                vertical-stretch: 1;
+                HorizontalLayout {
+                    width: parent.width;
+                    height: parent.height;
+                    visible: AppState.tab == 0;
+                    spacing: Palette.gap * 1.75;
+                    list := EntryList {
+                        width: 300px;
+                        edit => {
+                            if (AppState.selected >= 0) {
+                                editor.focus-label();
+                            }
+                        }
+                    }
+                    editor := EntryEditor {
+                        horizontal-stretch: 1;
+                    }
+                }
+                if AppState.tab == 1: SettingsPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if AppState.tab == 2: KeysPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if AppState.tab == 3: PacksPage {
+                    width: parent.width;
+                    height: parent.height;
+                }
+            }
+
+            // Footer: the essentials (from the keymap); the help screen lists everything.
+            HorizontalLayout {
+                vertical-stretch: 0;
+                spacing: Palette.gap * 2.75;
+                for h in AppState.hints: KeyHint {
+                    key: h.key;
+                    label: h.label;
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                if AppState.help-key != "": KeyHint {
+                    key: AppState.help-key;
+                    label: "all shortcuts";
+                }
+                // leave room for the resize grip
+                Rectangle {
+                    width: AppState.builtin-bar ? 14px : 0px;
+                }
+            }
+        }
+    }
+
+    if AppState.confirm-delete: ConfirmDelete {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-templates: TemplatesOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-vaults: VaultsOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-global: GlobalOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-themes: ThemesOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-import: ImportOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-fonts: FontsOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+    if AppState.show-help: HelpOverlay {
+        width: parent.width;
+        height: parent.height;
+    }
+
+    // Window border and resize grip for the built-in bar.
+    if AppState.builtin-bar: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-width: 1px;
+        border-color: Palette.line;
+    }
+    if AppState.builtin-bar: Rectangle {
+        x: parent.width - 18px;
+        y: parent.height - 18px;
+        width: 18px;
+        height: 18px;
+        Text {
+            text: "◢";
+            color: Palette.dim;
+            horizontal-alignment: right;
+            vertical-alignment: bottom;
+        }
+        TouchArea {
+            mouse-cursor: nwse-resize;
+            pointer-event(e) => {
+                if (e.kind == PointerEventKind.down) {
+                    root.native-move = false;
+                }
+            }
+            moved => {
+                if (!root.native-move) {
+                    root.native-move = root.start-resize();
+                }
+                if (!root.native-move) {
+                    root.resize-window(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y);
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,276 @@
+// Everything the UI shows and every action it can trigger. Rust owns the
+// logic (paddy-core); Slint only renders this and forwards user intent.
+export struct EntryRow {
+    id: int,
+    label: string,
+    tags: string,
+}
+
+export struct FieldRow {
+    key: string,
+    value: string,
+    secret: bool,
+    // UI-only: mask the value while `secret` is on. Not stored in the vault.
+    hidden: bool,
+}
+
+export struct TemplateRow {
+    id: int,
+    name: string,
+}
+
+export struct VarRow {
+    name: string,
+    value: string,
+}
+
+// A downloadable font in the catalog.
+export struct FontRow {
+    id: string,
+    family: string,
+    license: string,
+    size: string,
+    installed: bool,
+    active: bool,
+}
+
+// A template pack that can be added to the open vault.
+export struct PackRow {
+    id: string,
+    name: string,
+    detail: string,
+    count: int,
+}
+
+export struct PickRow {
+    primary: string,
+    secondary: string,
+}
+
+// One key chord bound to an action (an action may have several).
+export struct Binding {
+    action: string,
+    keys: keys,
+}
+
+export struct Hint {
+    key: string,
+    label: string,
+}
+
+// Row of the help screen; `header` rows are group titles.
+export struct HelpRow {
+    header: bool,
+    keys: string,
+    what: string,
+}
+
+// Row of the keys tab.
+export struct KeyRow {
+    header: bool,
+    id: string,
+    label: string,
+    chords: string,
+    is-default: bool,
+}
+
+// One rendered markdown block of a note.
+export struct MdBlock {
+    // h, p, li, quote, code, rule, gap
+    kind: string,
+    level: int,
+    marker: string,
+    plain: string,
+    text: styled-text,
+}
+
+export global AppState {
+    // vault
+    in property <string> vault-name;
+    in property <bool> dirty;
+    in property <string> status;
+    in property <bool> status-error;
+
+    // entry list + the entry being edited (the "draft" lives in these props)
+    in property <[EntryRow]> entries;
+    in-out property <int> selected: -1;
+    in-out property <string> draft-label;
+    in-out property <string> draft-tags;
+    in-out property <string> draft-notes;
+    in property <[FieldRow]> draft-fields;
+    // Row whose key input should grab focus when it is created (-1 = none).
+    in-out property <int> focus-field: -1;
+
+    // per-project search over the entry list
+    in-out property <string> search;
+
+    // overlays
+    in-out property <bool> confirm-delete;
+    in-out property <bool> show-templates;
+    in-out property <bool> show-vaults;
+    in-out property <bool> show-global;
+    in-out property <bool> show-help;
+    in-out property <bool> show-fonts;
+    in-out property <bool> show-themes;
+    in-out property <bool> show-import;
+    out property <bool> overlay-open: confirm-delete || show-templates || show-vaults || show-global || show-help || show-fonts || show-themes || show-import;
+
+    // logo (drawn in half-block characters; animated by Rust on events only)
+    in property <string> logo;
+    in property <string> logo-mini;
+    in property <string> about-text;
+
+    // top-level tab: 0 = entries, 1 = settings, 2 = keys, 3 = packs
+    in-out property <int> tab: 0;
+
+    // bumped by Rust to hand keyboard focus back to the open settings/keys page
+    in property <int> focus-page: 0;
+
+    // key bindings (built from the keymap in Rust)
+    in property <[Binding]> bindings;
+    in property <[Hint]> hints;
+    in property <string> help-key;
+    in property <[HelpRow]> help-left;
+    in property <[HelpRow]> help-right;
+    in property <[KeyRow]> key-rows;
+    in property <string> recording;
+    in property <string> recording-label;
+    in property <string> keys-note;
+
+    // notes as markdown
+    in-out property <bool> notes-preview;
+    in property <[MdBlock]> md-blocks;
+
+    // settings
+    in-out property <string> settings-hotkey;
+    in property <string> settings-note;
+    in property <bool> mini-on;
+    // themes
+    in property <string> theme-name;
+    in-out property <string> tp-query;
+    in property <[PickRow]> tp-rows;
+    in-out property <int> tp-selected: -1;
+
+    // packs tab: fonts, template packs, importing from a URL
+    in property <[FontRow]> pk-fonts;
+    in property <[PackRow]> pk-packs;
+    in-out property <string> import-url;
+    in property <bool> net-busy;
+    in property <string> net-note;
+    in property <string> import-title;
+    in property <string> import-body;
+
+    in property <string> font-name;
+    in property <int> font-size-px: 13;
+    in property <string> density-mode: "normal";
+    in property <bool> anim-on: true;
+    in property <int> clip-secs: 30;
+    in-out property <string> fp-query;
+    in property <[PickRow]> fp-rows;
+    in-out property <int> fp-selected: -1;
+    in property <string> window-bar-mode: "auto";
+    in property <bool> builtin-bar;
+    in property <string> diag-text;
+    in property <string> config-path;
+    in property <string> vaults-path;
+
+    // vault switcher
+    in-out property <string> vs-query;
+    in property <[PickRow]> vs-rows;
+    in-out property <int> vs-selected: -1;
+
+    // global search across all vaults
+    in-out property <string> gs-query;
+    in property <[PickRow]> gs-rows;
+    in-out property <int> gs-selected: -1;
+    in property <string> gs-preview;
+
+    // templates overlay
+    in property <[TemplateRow]> templates;
+    in-out property <int> tpl-selected: -1;
+    in-out property <string> tpl-name;
+    in-out property <string> tpl-pattern;
+    in property <[VarRow]> tpl-vars;
+    in property <string> tpl-preview;
+
+    callback select(int);
+    callback add-entry();
+    callback delete-entry();
+    callback cancel-delete();
+    callback save();
+    callback toggle-theme();
+    callback set-theme(bool);
+    callback open-settings();
+    callback close-settings();
+    callback set-window-bar(string);
+    callback bump-font-size(int);
+    callback reset-font-size();
+    callback set-density(string);
+    callback toggle-anim();
+    callback set-clip-secs(int);
+    callback open-themes();
+    callback close-themes();
+    callback tp-edited();
+    callback tp-select(int);
+    callback tp-open();
+    callback open-packs();
+    callback font-install(string);
+    callback font-use(string);
+    callback pack-add(string);
+    callback import-theme-url();
+    callback import-templates-url();
+    callback import-yes();
+    callback import-no();
+    callback open-fonts();
+    callback close-fonts();
+    callback fp-edited();
+    callback fp-select(int);
+    callback fp-open();
+    callback run-action(string);
+    callback open-keys();
+    callback key-change(string);
+    callback key-add(string);
+    callback key-clear(string);
+    callback key-reset(string);
+    callback keys-reset-all();
+    callback record-key(string, bool, bool, bool, bool);
+    callback cancel-record();
+    callback toggle-preview();
+    callback copy-notes();
+    callback md-link(string);
+    callback open-help();
+    callback close-help();
+    callback apply-hotkey();
+    callback toggle-mini();
+    callback copy-path(string);
+    callback search-edited();
+
+    callback open-vaults();
+    callback close-vaults();
+    callback vs-edited();
+    callback vs-select(int);
+    callback vs-open();
+
+    callback open-global();
+    callback close-global();
+    callback gs-edited();
+    callback gs-select(int);
+    callback gs-open();
+    callback draft-edited();
+
+    callback field-edited(int, string, string);
+    callback field-add();
+    callback field-remove(int);
+    callback field-toggle-secret(int);
+    callback field-toggle-hidden(int);
+    callback field-copy(int);
+
+    callback open-templates();
+    callback close-templates();
+    callback tpl-select(int);
+    callback tpl-new();
+    callback tpl-delete();
+    callback tpl-edited();
+    callback tpl-var-edited(int, string);
+    callback tpl-copy();
+}

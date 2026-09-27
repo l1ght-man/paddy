@@ -1,0 +1,35 @@
+# Push a tag like v0.1.0 to publish a release with the portable Linux binary.
+# install.sh downloads `paddy-x86_64-linux.tar.gz` and checks it against SHA256SUMS.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-0 libxcb-xkb1
+      - name: tests
+        run: cargo test --workspace
+      - name: portable build (glibc 2.30+)
+        run: scripts/release.sh
+      - name: package
+        run: |
+          d=paddy-x86_64-linux
+          mkdir -p $d/icons
+          cp target/x86_64-unknown-linux-gnu/release/paddy $d/
+          cp packaging/paddy.desktop scripts/doctor.sh LICENSE README.md $d/
+          cp assets/icons/* $d/icons/
+          tar -czf $d.tar.gz $d
+          sha256sum $d.tar.gz install.sh > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            paddy-x86_64-linux.tar.gz
+            SHA256SUMS
+            install.sh

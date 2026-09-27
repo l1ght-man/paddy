@@ -1,0 +1,28 @@
+[package]
+name = "paddy-ui"
+description = "Paddy desktop frontend (Slint)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "paddy"
+path = "src/main.rs"
+
+[dependencies]
+paddy-core = { path = "../paddy-core" }
+paddy-net = { path = "../paddy-net" }
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "backend-winit-x11", "backend-winit-wayland", "renderer-software", "unstable-fontique-011", "unstable-winit-030"] }
+arboard = { version = "3.6", default-features = false, features = ["wayland-data-control"] }
+
+[build-dependencies]
+slint-build = "1.18"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
+global-hotkey = "0.8"
+
+[dev-dependencies]
+png = "0.17"
+tempfile = "3"
+gif = "0.14"

@@ -1,0 +1,35 @@
+# paddy template pack
+id = network-engineer
+name = Network engineering
+author = paddy
+license = MIT
+description = Cisco, Juniper and Linux networking commands you type all day.
+
+[templates]
+Cisco: interface status = show interfaces status
+Cisco: interface brief = show ip interface brief
+Cisco: interface detail = show interfaces {interface}
+Cisco: trunk info = show interfaces {interface} trunk
+Cisco: VLANs = show vlan brief
+Cisco: MAC lookup = show mac address-table address {mac}
+Cisco: ARP lookup = show ip arp {ip}
+Cisco: route lookup = show ip route {prefix}
+Cisco: OSPF neighbors = show ip ospf neighbor
+Cisco: BGP summary = show ip bgp summary
+Cisco: running config section = show running-config | section {keyword}
+Cisco: save config = copy running-config startup-config
+Juniper: interfaces terse = show interfaces terse
+Juniper: route lookup = show route {prefix}
+Juniper: BGP summary = show bgp summary
+Juniper: config diff = show | compare
+Linux: addresses = ip -br addr
+Linux: add route = sudo ip route add {prefix} via {gateway} dev {interface}
+Linux: listening sockets = ss -tulpn
+Linux: tcpdump host = sudo tcpdump -ni {interface} host {ip}
+Linux: tcpdump port = sudo tcpdump -ni {interface} port {port}
+Linux: path trace = mtr -rwzbc 50 {host}
+Linux: dns lookup = dig +short {name} @{dns}
+Linux: http headers = curl -sSI {url}
+SNMP walk = snmpwalk -v2c -c {community} {ip} {oid}
+Ping sweep = fping -asg {cidr}
+SSH via jump host = ssh -J {jump_user}@{jump_host} {user}@{host}

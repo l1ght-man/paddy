@@ -1,0 +1,28 @@
+# paddy template pack
+id = recon-enum
+name = Recon and enumeration
+author = paddy
+license = MIT
+description = Everyday scanning and enumeration commands for labs, CTFs and exams. Use only on systems you are authorized to test.
+
+[templates]
+nmap: default scripts and versions = nmap -sC -sV -T4 --top-ports 1000 -oA {name} {ip}
+nmap: all TCP ports fast = nmap -p- --min-rate 5000 -T4 -oA {name}_all {ip}
+nmap: UDP top 100 = sudo nmap -sU --top-ports 100 {ip}
+nmap: targeted scripts = nmap -sV -sC -p {ports} -oA {name}_targeted {ip}
+gobuster: directories = gobuster dir -u http://{ip}:{port} -w {wordlist} -x {ext} -t 40
+ffuf: virtual hosts = ffuf -u http://{ip}/ -H 'Host: FUZZ.{domain}' -w {wordlist} -fs {size}
+nikto = nikto -h http://{ip}:{port}
+whatweb = whatweb -a 3 http://{ip}:{port}
+sslscan = sslscan {ip}:{port}
+SMB: list shares (null session) = smbclient -L //{ip} -N
+SMB: connect to a share = smbclient //{ip}/{share} -U {user}
+enum4linux-ng = enum4linux-ng -A {ip}
+RPC null session = rpcclient -U '' -N {ip}
+NFS exports = showmount -e {ip}
+LDAP anonymous search = ldapsearch -x -H ldap://{ip} -b '{base_dn}'
+DNS zone transfer = dig axfr {domain} @{ip}
+SNMP community guess = onesixtyone -c {communities} {ip}
+hashcat crack = hashcat -m {mode} {hashfile} {wordlist}
+john crack = john --wordlist={wordlist} {hashfile}
+hydra SSH = hydra -l {user} -P {wordlist} ssh://{ip}

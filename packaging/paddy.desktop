@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=paddy
+GenericName=Quick-access pad
+Comment=IPs, credentials and commands you reuse all day
+Exec=paddy
+Icon=paddy
+Terminal=false
+Categories=Utility;Network;
+Keywords=notes;credentials;ip;commands;pentest;network;
+StartupWMClass=paddy
+StartupNotify=true

@@ -1,0 +1,252 @@
+import { Palette } from "theme.slint";
+
+// Box with a title cut into its top border, like a terminal frame.
+export component Panel inherits Rectangle {
+    in property <string> title;
+    in property <bool> active: false;
+
+    background: Palette.panel;
+    border-width: 1px;
+    border-color: active ? Palette.accent : Palette.line;
+
+    Rectangle {
+        x: 10px;
+        y: -Palette.fs / 2 - 2px;
+        height: Palette.fs + 4px;
+        width: title-text.preferred-width + 12px;
+        background: Palette.bg;
+        title-text := Text {
+            text: root.title;
+            color: root.active ? Palette.accent : Palette.dim;
+            font-size: Palette.fs;
+        }
+    }
+
+    VerticalLayout {
+        padding: Palette.gap * 1.5;
+        padding-top: Palette.fs + Palette.gap;
+        spacing: Palette.gap;
+        @children
+    }
+}
+
+// Single-line input drawn as an underlined terminal field.
+export component TInput inherits Rectangle {
+    in-out property <string> text <=> ti.text;
+    in property <string> placeholder;
+    in property <bool> password: false;
+    out property <bool> has-focus: ti.has-focus;
+    callback edited();
+    callback accepted();
+    public function focus-input() {
+        ti.focus();
+    }
+
+    min-height: Palette.row;
+    background: ti.has-focus ? Palette.sel-bg : transparent;
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: ti.has-focus ? Palette.accent : Palette.line;
+    }
+
+    ti := TextInput {
+        x: 4px;
+        width: parent.width - 8px;
+        height: parent.height;
+        vertical-alignment: center;
+        single-line: true;
+        color: Palette.fg;
+        font-size: Palette.fs;
+        input-type: root.password ? InputType.password : InputType.text;
+        selection-background-color: Palette.accent;
+        selection-foreground-color: Palette.bg;
+        edited => {
+            root.edited();
+        }
+        accepted => {
+            root.accepted();
+        }
+    }
+
+    if ti.text == "" && root.placeholder != "": Text {
+        x: 4px;
+        text: root.placeholder;
+        color: Palette.dim;
+        font-size: Palette.fs;
+        vertical-alignment: center;
+        height: parent.height;
+    }
+}
+
+// Multi-line input that scrolls to keep the cursor visible.
+export component NotesInput inherits Rectangle {
+    in-out property <string> text <=> ti.text;
+    out property <bool> has-focus: ti.has-focus;
+    callback edited();
+    public function focus-input() {
+        ti.focus();
+    }
+
+    background: ti.has-focus ? Palette.sel-bg : transparent;
+
+    fl := Flickable {
+        content-height: max(self.height, ti.preferred-height + 4px);
+        ti := TextInput {
+            x: 4px;
+            width: fl.width - 8px;
+            height: max(fl.height, self.preferred-height);
+            wrap: word-wrap;
+            single-line: false;
+            color: Palette.fg;
+            font-size: Palette.fs;
+            selection-background-color: Palette.accent;
+            selection-foreground-color: Palette.bg;
+            edited => {
+                root.edited();
+            }
+            cursor-position-changed(pos) => {
+                if (pos.y + fl.content-y < 0px) {
+                    fl.content-y = -pos.y;
+                } else if (pos.y + fl.content-y + Palette.fs * 1.7 > fl.height) {
+                    fl.content-y = -(pos.y + Palette.fs * 1.7 - fl.height);
+                }
+            }
+        }
+    }
+}
+
+// Tiny bracketed text button: [s] [x] ...
+export component TBtn inherits Rectangle {
+    in property <string> label;
+    in property <bool> on: false;
+    in property <color> tint: Palette.dim;
+    callback clicked();
+
+    width: t.preferred-width + 6px;
+    t := Text {
+        text: "[" + root.label + "]";
+        color: root.on ? Palette.accent : (ta.has-hover ? Palette.fg : root.tint);
+        font-size: Palette.fs;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+    }
+
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// "Ctrl+N  New" style shortcut chip: key in accent, label dim.
+export component KeyHint inherits HorizontalLayout {
+    in property <string> key;
+    in property <string> label;
+    spacing: Palette.gap * 0.75;
+    Text {
+        text: root.key;
+        color: Palette.accent;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.label;
+        color: Palette.dim;
+        vertical-alignment: center;
+    }
+}
+
+// Tab in the header row.
+export component TabBtn inherits Rectangle {
+    in property <string> label;
+    in property <bool> active: false;
+    callback clicked();
+    width: t.preferred-width + 20px;
+    background: active ? Palette.sel-bg : (ta.has-hover ? Palette.sel-bg.with-alpha(0.5) : transparent);
+    border-width: 1px;
+    border-color: active ? Palette.accent : transparent;
+    t := Text {
+        text: root.label;
+        color: root.active ? Palette.accent : Palette.dim;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Window control button for the built-in title bar.
+export component WinBtn inherits Rectangle {
+    in property <string> glyph;
+    in property <color> hover: Palette.sel-bg;
+    callback clicked();
+    width: 34px;
+    background: ta.has-hover ? root.hover : transparent;
+    Text {
+        text: root.glyph;
+        color: ta.has-hover ? Palette.fg : Palette.dim;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Label + control row used on the settings page and help screen.
+export component SettingRow inherits HorizontalLayout {
+    in property <string> label;
+    spacing: Palette.gap;
+    Text {
+        text: root.label;
+        color: Palette.dim;
+        width: Palette.ch * 22;
+        vertical-alignment: center;
+    }
+    @children
+}
+
+// One line of the shortcut table.
+export component ShortcutRow inherits HorizontalLayout {
+    in property <string> keys;
+    in property <string> what;
+    spacing: Palette.gap * 1.5;
+    height: Palette.row;
+    Text {
+        text: root.keys;
+        color: Palette.accent;
+        width: Palette.ch * 25;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.what;
+        color: Palette.fg;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+// Vector logo: SVG path data drawn in a `cols` x `rows` block grid.
+export component Logo inherits Rectangle {
+    in property <string> data;
+    in property <int> cols;
+    in property <int> rows;
+    in property <length> unit: 7px;
+    in property <color> tint: Palette.accent;
+    width: root.cols * root.unit;
+    height: root.rows * root.unit;
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: root.cols;
+        viewbox-height: root.rows;
+        commands: root.data;
+        fill: root.tint;
+    }
+}

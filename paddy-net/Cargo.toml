@@ -1,0 +1,10 @@
+[package]
+name = "paddy-net"
+description = "The only place paddy talks to the network: small, size-limited HTTPS downloads"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+paddy-core = { path = "../paddy-core" }
+ureq = { version = "3", default-features = false, features = ["rustls"] }

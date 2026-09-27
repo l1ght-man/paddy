@@ -1,0 +1,25 @@
+# paddy template pack
+id = transfer-tunnel
+name = File transfer and tunnels
+author = paddy
+license = MIT
+description = Moving files and forwarding ports.
+
+[templates]
+Python web server = python3 -m http.server {port}
+wget download = wget http://{ip}:{port}/{file} -O {file}
+curl download = curl -o {file} http://{ip}:{port}/{file}
+scp upload = scp -P {port} {file} {user}@{ip}:{path}
+scp download = scp -P {port} {user}@{ip}:{path} .
+netcat receive file = nc -lvnp {port} > {file}
+netcat send file = nc {ip} {port} < {file}
+base64 encode a file = base64 -w0 {file}
+SSH local forward = ssh -N -L {lport}:{target}:{tport} {user}@{ip}
+SSH remote forward = ssh -N -R {rport}:127.0.0.1:{lport} {user}@{ip}
+SSH SOCKS proxy = ssh -N -D {lport} {user}@{ip}
+chisel server = chisel server -p {port} --reverse
+chisel client (reverse forward) = chisel client {ip}:{port} R:{lport}:{target}:{tport}
+socat port forward = socat TCP-LISTEN:{lport},fork TCP:{target}:{tport}
+proxychains nmap = proxychains -q nmap -sT -Pn -p {ports} {ip}
+PowerShell download = powershell -c "iwr http://{ip}:{port}/{file} -OutFile {file}"
+certutil download = certutil -urlcache -split -f http://{ip}:{port}/{file} {file}
