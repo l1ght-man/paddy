@@ -23,12 +23,22 @@ jobs:
           d=paddy-x86_64-linux
           mkdir -p $d/icons
           cp target/x86_64-unknown-linux-gnu/release/paddy $d/
-          cp packaging/paddy.desktop scripts/doctor.sh LICENSE README.md $d/
+          cp packaging/paddy.desktop scripts/doctor.sh LICENSE THIRD-PARTY-NOTICES.md README.md $d/
           cp assets/icons/* $d/icons/
           tar -czf $d.tar.gz $d
           sha256sum $d.tar.gz install.sh > SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
+          body: |
+            Install or update (Linux x86_64):
+
+            ```sh
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | sh
+            ```
+
+            Licensed under the [PolyForm Strict License 1.0.0](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/LICENSE): free for personal and other noncommercial use; no copying, modifying or redistributing. Third-party licenses are in `THIRD-PARTY-NOTICES.md` inside the download.
+
+            <a href="https://slint.dev"><img src="https://raw.githubusercontent.com/${{ github.repository }}/main/docs/media/made-with-slint.png" width="160" alt="Made with Slint"></a>
           files: |
             paddy-x86_64-linux.tar.gz
             SHA256SUMS

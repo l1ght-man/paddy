@@ -2,7 +2,7 @@
 id = recon-enum
 name = Recon and enumeration
 author = paddy
-license = MIT
+license = PolyForm-Strict-1.0.0
 description = Everyday scanning and enumeration commands for labs, CTFs and exams. Use only on systems you are authorized to test.
 
 [templates]

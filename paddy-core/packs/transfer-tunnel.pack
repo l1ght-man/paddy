@@ -2,7 +2,7 @@
 id = transfer-tunnel
 name = File transfer and tunnels
 author = paddy
-license = MIT
+license = PolyForm-Strict-1.0.0
 description = Moving files and forwarding ports.
 
 [templates]

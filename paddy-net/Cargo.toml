@@ -4,6 +4,7 @@ description = "The only place paddy talks to the network: small, size-limited HT
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 paddy-core = { path = "../paddy-core" }

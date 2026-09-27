@@ -2,7 +2,7 @@
 id = windows-ad
 name = Windows and Active Directory
 author = paddy
-license = MIT
+license = PolyForm-Strict-1.0.0
 description = Windows and AD enumeration and access commands for labs and exams. Use only on systems you are authorized to test.
 
 [templates]

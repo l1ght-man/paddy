@@ -4,6 +4,7 @@ description = "Paddy data model, vault storage and template logic (UI-agnostic)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 rusqlite = { version = "0.40", features = ["bundled", "backup"] }

@@ -11,7 +11,7 @@ Network engineering, labs, exams. Rust + Slint, local SQLite vaults, offline by 
 <a href="https://github.com/l1ght-man/paddy/releases/latest"><img src="https://img.shields.io/github/v/release/l1ght-man/paddy?style=flat-square" alt="release"></a>
 <a href="https://github.com/l1ght-man/paddy/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/l1ght-man/paddy/ci.yml?branch=main&style=flat-square&label=ci" alt="ci"></a>
 <img src="https://img.shields.io/badge/platform-linux%20x86__64-informational?style=flat-square" alt="platform">
-<a href="LICENSE"><img src="https://img.shields.io/github/license/l1ght-man/paddy?style=flat-square" alt="license"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Strict%201.0.0-orange?style=flat-square" alt="license: PolyForm Strict 1.0.0"></a>
 </p>
 
 <p align="center"><img src="docs/media/main.png" width="820" alt="paddy main window"></p>
@@ -139,4 +139,22 @@ Crates: `paddy-core` (data, storage, parsing, no UI, no network), `paddy-net` (d
 
 ## License
 
-MIT. Downloaded fonts keep their own licenses (OFL, UFL, MIT), shown in the packs tab.
+paddy is **source-available, not open source**. It is licensed under the
+[PolyForm Strict License 1.0.0](LICENSE). Copyright (c) 2026 l1ght-man.
+
+- **You may:** download paddy and use it for free for personal, study, lab, exam and other noncommercial purposes,
+  and read the code.
+- **You may not:** copy, modify, fork into your own project, redistribute, rebrand or sell paddy or its code,
+  or use it commercially, without written permission.
+- Want to use it at work or build on it? Open an issue to ask for a commercial license.
+
+The license text in [LICENSE](LICENSE) is what counts; this summary is only a guide.
+Versions released before v0.2.0 were published under MIT.
+
+Third-party components keep their own licenses, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+(shipped in every release). Downloaded fonts keep theirs too (OFL, UFL, MIT), shown in the packs tab.
+
+<a href="https://slint.dev"><img src="docs/media/made-with-slint.png" width="160" alt="Made with Slint"></a>
+
+paddy's interface is built with [Slint](https://slint.dev), used under the
+Slint Royalty-free Desktop, Mobile, and Web Applications License 2.0.

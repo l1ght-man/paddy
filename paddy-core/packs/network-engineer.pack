@@ -2,7 +2,7 @@
 id = network-engineer
 name = Network engineering
 author = paddy
-license = MIT
+license = PolyForm-Strict-1.0.0
 description = Cisco, Juniper and Linux networking commands you type all day.
 
 [templates]
