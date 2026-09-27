@@ -70,8 +70,9 @@ impl App {
         }
     }
 
-    fn copy_notes(&self) {
+    pub(crate) fn copy_notes(&self) {
         let notes = self.with_state(|s| s.get_draft_notes().to_string());
+        self.note_copy("notes", false);
         if self.copy_text(&notes) {
             self.set_status("copied notes as markdown", false);
         }

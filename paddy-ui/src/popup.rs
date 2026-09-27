@@ -7,6 +7,8 @@ use std::time::Duration;
 
 use slint::{ComponentHandle, Model, SharedString, TimerMode};
 
+use paddy_core::Action;
+
 use crate::app::{field_row, App};
 use crate::desktop::{Desktop, DesktopEvent};
 use crate::{FieldRow, PopupState, QuickRow};
@@ -27,6 +29,8 @@ impl App {
         bind!(on_field_edited, quick_field_edited, i, v);
         bind!(on_field_copy, quick_field_copy, i);
         bind!(on_field_toggle_hidden, quick_toggle_hidden, i);
+        bind!(on_field_step, quick_field_step, d);
+        bind!(on_key_capture, quick_key_capture, t, c, a, s, m);
         bind!(on_hide, quick_hide);
     }
 
@@ -143,9 +147,69 @@ impl App {
             let res = self.vault.borrow().get_entry(r.id as i64);
             self.report(res)
         });
-        self.quick.global::<PopupState>().set_selected(if entry.is_some() { idx } else { -1 });
+        let st = self.quick.global::<PopupState>();
+        st.set_selected(if entry.is_some() { idx } else { -1 });
         let rows: Vec<FieldRow> = entry.map(|e| e.fields.iter().map(field_row).collect()).unwrap_or_default();
+        // A new entry starts the Tab cursor on its first field (what Enter copies).
+        st.set_field_cursor(if rows.is_empty() { -1 } else { 0 });
         self.quick_fields.set_vec(rows);
+    }
+
+    /// Tab / Shift+Tab and the next / previous field actions: move the cursor (clamped).
+    fn quick_field_step(&self, delta: i32) {
+        let n = self.quick_fields.row_count() as i32;
+        if n == 0 {
+            return;
+        }
+        let st = self.quick.global::<PopupState>();
+        st.set_field_cursor((st.get_field_cursor() + delta).clamp(0, n - 1));
+    }
+
+    /// Bound chords in the popup: the move and copy actions apply here too
+    /// (same keymap as the main window); everything else is left to the widgets.
+    fn quick_key_capture(&self, text: SharedString, ctrl: bool, alt: bool, shift: bool, meta: bool) -> bool {
+        let Some(action) = self.action_for_event(text.as_str(), ctrl, alt, shift, meta) else { return false };
+        let st = self.quick.global::<PopupState>();
+        match action {
+            Action::NextEntry | Action::PrevEntry => {
+                let n = self.quick_rows.row_count() as i32;
+                if n > 0 {
+                    let d = if action == Action::NextEntry { 1 } else { -1 };
+                    let next = (st.get_selected() + d).clamp(0, n - 1);
+                    if next != st.get_selected() {
+                        self.quick_select(next);
+                    }
+                }
+            }
+            Action::NextField => self.quick_field_step(1),
+            Action::PrevField => self.quick_field_step(-1),
+            Action::CopyField1 | Action::CopyField2 | Action::CopyField3 | Action::CopyField4 => {
+                let i = action.copy_field_index().unwrap_or(0);
+                if i < self.quick_fields.row_count() {
+                    self.quick_field_copy(i as i32);
+                } else {
+                    st.set_status(format!("no field {}", i + 1).into());
+                }
+            }
+            Action::CopyNotes => self.quick_copy_notes(),
+            _ => return false,
+        }
+        true
+    }
+
+    fn quick_copy_notes(&self) {
+        let Some(id) = self.quick_selected_id() else { return };
+        let res = self.vault.borrow().get_entry(id);
+        let Some(entry) = self.report(res) else { return };
+        if entry.notes.trim().is_empty() {
+            self.quick.global::<PopupState>().set_status("no notes".into());
+            return;
+        }
+        self.note_copy("notes", false);
+        if self.copy_text(&entry.notes) {
+            self.set_status("copied notes", false);
+            self.quick_hide();
+        }
     }
 
     fn quick_query_edited(&self) {
@@ -192,10 +256,8 @@ impl App {
         let Some(row) = usize::try_from(i).ok().and_then(|i| self.quick_fields.row_data(i)) else {
             return;
         };
-        let copied = if row.secret { self.copy_secret(row.value.as_str()) } else { self.copy_text(row.value.as_str()) };
-        if copied {
-            let what = if row.key.is_empty() { "value" } else { row.key.as_str() };
-            self.set_status(&format!("copied {what}"), false);
+        // Same path as the main window: secret fields get the clipboard auto-clear.
+        if self.copy_field_row(&row) {
             self.quick_hide();
         }
     }

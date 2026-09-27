@@ -100,6 +100,10 @@ export global AppState {
     in property <[FieldRow]> draft-fields;
     // Row whose key input should grab focus when it is created (-1 = none).
     in-out property <int> focus-field: -1;
+    // Keyboard cursor in the fields area (highlighted while that area has focus).
+    in-out property <int> field-cursor: -1;
+    // "Alt+→ walk · Ctrl+1..4 copy": built from the keymap.
+    in property <string> fields-hint;
 
     // per-project search over the entry list
     in-out property <string> search;
@@ -227,6 +231,10 @@ export global AppState {
     callback fp-select(int);
     callback fp-open();
     callback run-action(string);
+    // Every key press in the main window goes here first (capture phase), so bound
+    // chords win over text editing (Alt+↑ would move the text cursor otherwise).
+    // Returns true when the chord ran an action.
+    callback key-capture(string, bool, bool, bool, bool) -> bool;
     callback open-keys();
     callback key-change(string);
     callback key-add(string);

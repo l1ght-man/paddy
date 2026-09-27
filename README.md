@@ -47,13 +47,13 @@ tar xzf paddy-x86_64-linux.tar.gz && ./paddy-x86_64-linux/paddy
 
 | | |
 |---|---|
-| **Quick list** from the tray or `Ctrl+Alt+P`, anywhere: type to filter, `Ctrl+1..4` copies a field | **Templates** fill themselves from the selected entry (`Ctrl+T`) |
+| **Quick list** from the tray or `Ctrl+Alt+P`, anywhere: type to filter, `Tab` + `Enter` or `Ctrl+1..4` copies a field | **Templates** fill themselves from the selected entry (`Ctrl+T`) |
 | <img src="docs/media/quick.gif" alt="quick list"> | <img src="docs/media/templates.gif" alt="templates"> |
 | **Notes are markdown**, `Ctrl+E` flips edit / preview | **Search** the vault as you type (`Ctrl+F`), or all vaults (`Ctrl+G`) |
 | <img src="docs/media/notes.gif" alt="markdown notes"> | <img src="docs/media/search.gif" alt="search"> |
 | **12 themes**, previewed live | **Light cream** |
 | <img src="docs/media/themes.gif" alt="themes"> | <img src="docs/media/light.png" alt="light theme"> |
-| **Packs**: themes, fonts, template packs | **Every shortcut is yours to rebind** (`Ctrl+K`) |
+| **Packs**: themes, fonts, template packs | **No mouse needed**: move with `Alt+↑↓`, copy with `Ctrl+1..4`; every shortcut is yours to rebind (`Ctrl+K`) |
 | <img src="docs/media/packs.png" alt="packs tab"> | <img src="docs/media/keys.png" alt="keys tab"> |
 
 ## Features
@@ -61,9 +61,14 @@ tar xzf paddy-x86_64-linux.tar.gz && ./paddy-x86_64-linux/paddy
 - **Vaults**: one SQLite file per project, switch with `Ctrl+O`, search one (`Ctrl+F`) or all (`Ctrl+G`).
 - **Entries**: label, tags, key/value fields (secrets can be masked), markdown notes with a preview (`Ctrl+E`).
 - **Templates**: `ssh {user}@{host}` style commands, auto-filled from the selected entry (`Ctrl+T`). Four built-in packs (network engineering, recon, file transfer/tunnels, Windows/AD).
-- **Quick list**: tray icon or global hotkey (`Ctrl+Alt+P`, X11) opens a small searchable popup; `Ctrl+1..4` copies a field.
+- **Quick list**: tray icon or global hotkey (`Ctrl+Alt+P`, X11) opens a small searchable popup; `↑↓` pick an entry while you type, `Tab` / `Shift+Tab` pick a field, `Enter` copies it (or `Ctrl+1..4` directly), `Esc` hides it.
 - **Looks**: 12 themes, downloadable fonts (checksum-verified), text size, spacing, a floppy logo.
-- **Keys**: every shortcut can be rebound on the keys tab (`Ctrl+K`); `F1` lists them.
+- **Keyboard only**: from anywhere in the main window, even while typing in a field:
+  `Alt+↓` / `Alt+↑` (or `Alt+J` / `Alt+K`) next / previous entry,
+  `Alt+→` / `Alt+←` (or `Alt+L` / `Alt+H`) walk the fields (`↑↓` `Tab` move, `Enter` or `Ctrl+C` copies, `Esc` back to the list),
+  `Ctrl+1..4` copy field 1-4 of the selected entry, `Ctrl+Shift+C` copy its notes.
+  Secret fields copied from the keyboard are cleared from the clipboard like the `[c]` button (settings: clipboard auto-clear).
+- **Keys**: every shortcut can be rebound on the keys tab (`Ctrl+K`), or in the settings file (`key.next_entry = alt+down, alt+j`); `F1` lists them.
 
 ## Build from source
 
