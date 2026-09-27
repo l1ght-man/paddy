@@ -27,14 +27,32 @@ pub enum Action {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    NextEntry,
+    PrevEntry,
+    NextField,
+    PrevField,
+    CopyField1,
+    CopyField2,
+    CopyField3,
+    CopyField4,
+    CopyNotes,
 }
 
 impl Action {
-    pub const ALL: [Action; 16] = [
+    pub const ALL: [Action; 25] = [
         Action::NewEntry,
         Action::Save,
         Action::DeleteEntry,
         Action::TogglePreview,
+        Action::NextEntry,
+        Action::PrevEntry,
+        Action::NextField,
+        Action::PrevField,
+        Action::CopyField1,
+        Action::CopyField2,
+        Action::CopyField3,
+        Action::CopyField4,
+        Action::CopyNotes,
         Action::Find,
         Action::FindAll,
         Action::Vaults,
@@ -68,6 +86,15 @@ impl Action {
             Action::ZoomIn => "zoom_in",
             Action::ZoomOut => "zoom_out",
             Action::ZoomReset => "zoom_reset",
+            Action::NextEntry => "next_entry",
+            Action::PrevEntry => "prev_entry",
+            Action::NextField => "next_field",
+            Action::PrevField => "prev_field",
+            Action::CopyField1 => "copy_field_1",
+            Action::CopyField2 => "copy_field_2",
+            Action::CopyField3 => "copy_field_3",
+            Action::CopyField4 => "copy_field_4",
+            Action::CopyNotes => "copy_notes",
         }
     }
 
@@ -94,12 +121,25 @@ impl Action {
             Action::ZoomIn => "bigger text",
             Action::ZoomOut => "smaller text",
             Action::ZoomReset => "reset text size",
+            Action::NextEntry => "next entry",
+            Action::PrevEntry => "previous entry",
+            Action::NextField => "next field",
+            Action::PrevField => "previous field",
+            Action::CopyField1 => "copy field 1",
+            Action::CopyField2 => "copy field 2",
+            Action::CopyField3 => "copy field 3",
+            Action::CopyField4 => "copy field 4",
+            Action::CopyNotes => "copy notes",
         }
     }
 
     pub fn group(self) -> &'static str {
         match self {
             Action::NewEntry | Action::Save | Action::DeleteEntry | Action::TogglePreview => "entries",
+            Action::NextEntry | Action::PrevEntry | Action::NextField | Action::PrevField => "move",
+            Action::CopyField1 | Action::CopyField2 | Action::CopyField3 | Action::CopyField4 | Action::CopyNotes => {
+                "copy"
+            }
             Action::Find | Action::FindAll | Action::Vaults => "find and switch",
             _ => "app",
         }
@@ -124,8 +164,32 @@ impl Action {
             Action::ZoomIn => &["ctrl+="],
             Action::ZoomOut => &["ctrl+-"],
             Action::ZoomReset => &["ctrl+0"],
+            // Alt + arrows / hjkl: free in text fields, so they work while typing too.
+            Action::NextEntry => &["alt+down", "alt+j"],
+            Action::PrevEntry => &["alt+up", "alt+k"],
+            Action::NextField => &["alt+right", "alt+l"],
+            Action::PrevField => &["alt+left", "alt+h"],
+            Action::CopyField1 => &["ctrl+1"],
+            Action::CopyField2 => &["ctrl+2"],
+            Action::CopyField3 => &["ctrl+3"],
+            Action::CopyField4 => &["ctrl+4"],
+            Action::CopyNotes => &["ctrl+shift+c"],
         }
     }
+
+    /// For the copy-field actions: which field (0-based) they copy.
+    pub fn copy_field_index(self) -> Option<usize> {
+        match self {
+            Action::CopyField1 => Some(0),
+            Action::CopyField2 => Some(1),
+            Action::CopyField3 => Some(2),
+            Action::CopyField4 => Some(3),
+            _ => None,
+        }
+    }
+
+    /// Groups in display order (help screen, keys tab).
+    pub const GROUPS: [&'static str; 5] = ["entries", "move", "copy", "find and switch", "app"];
 
     /// Does the action still work while a popup (dialog, picker, help) is open?
     pub fn works_in_overlay(self) -> bool {
@@ -561,6 +625,63 @@ mod tests {
             assert_eq!(Action::from_id(a.id()), Some(a));
         }
         assert!(map.overrides().is_empty(), "defaults write nothing to the file");
+    }
+
+    #[test]
+    fn move_and_copy_defaults() {
+        let map = Keymap::default();
+        for (s, a) in [
+            ("alt+down", Action::NextEntry),
+            ("alt+j", Action::NextEntry),
+            ("alt+up", Action::PrevEntry),
+            ("alt+k", Action::PrevEntry),
+            ("alt+right", Action::NextField),
+            ("alt+l", Action::NextField),
+            ("alt+left", Action::PrevField),
+            ("alt+h", Action::PrevField),
+            ("ctrl+1", Action::CopyField1),
+            ("ctrl+4", Action::CopyField4),
+            ("ctrl+shift+c", Action::CopyNotes),
+        ] {
+            assert_eq!(map.lookup(&chord(s)), Some(a), "{s}");
+        }
+        // the older shortcuts are untouched
+        for (s, a) in [("ctrl+n", Action::NewEntry), ("ctrl+k", Action::Keys), ("ctrl+0", Action::ZoomReset)] {
+            assert_eq!(map.lookup(&chord(s)), Some(a), "{s}");
+        }
+        assert_eq!(map.lookup(&chord("ctrl+c")), None, "plain Ctrl+C stays text copy");
+        assert_eq!(map.lookup(&chord("ctrl+5")), None);
+        let idx: Vec<_> = Action::ALL.into_iter().filter_map(Action::copy_field_index).collect();
+        assert_eq!(idx, [0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn every_action_is_in_a_listed_group() {
+        for a in Action::ALL {
+            assert!(Action::GROUPS.contains(&a.group()), "{a:?} in unlisted group {}", a.group());
+            assert!(!a.works_in_overlay() || a.group() == "entries" || a.group() == "app", "{a:?}");
+        }
+        for g in Action::GROUPS {
+            assert!(Action::ALL.into_iter().any(|a| a.group() == g), "empty group {g}");
+        }
+        let ids: std::collections::HashSet<_> = Action::ALL.into_iter().map(Action::id).collect();
+        assert_eq!(ids.len(), Action::ALL.len(), "ids are unique");
+    }
+
+    #[test]
+    fn new_actions_rebind_and_swap_like_the_rest() {
+        let mut o = BTreeMap::new();
+        o.insert("next_entry".to_string(), "ctrl+j".to_string());
+        o.insert("copy_field_1".to_string(), "alt+1".to_string());
+        let (map, warnings) = Keymap::from_overrides(&o);
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(map.lookup(&chord("ctrl+j")), Some(Action::NextEntry));
+        assert_eq!(map.lookup(&chord("alt+down")), None, "override replaces both defaults");
+        assert_eq!(map.lookup(&chord("alt+1")), Some(Action::CopyField1));
+        // taking a move key for another action is refused with the move action's name
+        let mut map = Keymap::default();
+        let err = map.set(Action::Theme, vec![chord("alt+up")]).unwrap_err();
+        assert!(err.to_string().contains("previous entry"), "{err}");
     }
 
     #[test]

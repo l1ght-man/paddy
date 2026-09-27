@@ -149,10 +149,22 @@ component EntryList inherits Panel {
 component FieldRowView inherits Rectangle {
     in property <int> index;
     in property <FieldRow> f;
+    // Keyboard cursor of the fields area is on this row (Enter copies it).
+    in property <bool> cursor;
     height: Palette.row;
+    background: root.cursor ? Palette.sel-bg : transparent;
+    border-width: 1px;
+    border-color: root.cursor ? Palette.accent : transparent;
 
     HorizontalLayout {
         spacing: Palette.gap * 0.75;
+        Text {
+            text: root.cursor ? "▸" : " ";
+            color: Palette.accent;
+            width: Palette.ch * 1.5;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
         key-in := TInput {
             width: Palette.ch * 17;
             placeholder: "key";
@@ -198,6 +210,7 @@ component FieldRowView inherits Rectangle {
         }
         TBtn {
             label: "c";
+            on: root.cursor;
             clicked => {
                 AppState.field-copy(root.index);
             }
@@ -318,9 +331,31 @@ component MdView inherits Rectangle {
 
 component EntryEditor inherits Panel {
     title: "entry";
-    active: label-in.has-focus || tags-in.has-focus || notes-in.has-focus;
+    active: label-in.has-focus || tags-in.has-focus || notes-in.has-focus || fields-fs.has-focus;
     public function focus-label() {
         label-in.focus-input();
+    }
+    // The fields area: a cursor row instead of a text cursor (keyboard walk + copy).
+    public function focus-fields() {
+        fields-fs.focus();
+    }
+    public pure function fields-focused() -> bool {
+        return fields-fs.has-focus;
+    }
+    function step-field(d: int) {
+        AppState.field-cursor = max(0, min(AppState.draft-fields.length - 1, AppState.field-cursor + d));
+    }
+    // Keep the cursor row on screen.
+    property <int> cursor: AppState.field-cursor;
+    property <length> field-stride: Palette.row + 4px;
+    changed cursor => {
+        if (root.cursor >= 0) {
+            if (root.cursor * root.field-stride < -ff.content-y) {
+                ff.content-y = -root.cursor * root.field-stride;
+            } else if ((root.cursor + 1) * root.field-stride > -ff.content-y + ff.height) {
+                ff.content-y = -((root.cursor + 1) * root.field-stride - ff.height);
+            }
+        }
     }
 
     Rectangle {
@@ -382,9 +417,18 @@ component EntryEditor inherits Panel {
             }
         }
         HorizontalLayout {
+            spacing: Palette.gap;
             Text {
                 text: "── fields ──";
+                color: fields-fs.has-focus ? Palette.accent : Palette.dim;
+                vertical-alignment: center;
+            }
+            Text {
+                text: fields-fs.has-focus ? "↑↓ Tab pick   Enter copy   Esc list" : AppState.fields-hint;
                 color: Palette.dim;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+                overflow: elide;
                 horizontal-stretch: 1;
             }
             TBtn {
@@ -394,15 +438,71 @@ component EntryEditor inherits Panel {
                 }
             }
         }
-        Flickable {
+        fields-fs := FocusScope {
             vertical-stretch: 1;
             min-height: 60px;
-            content-height: AppState.draft-fields.length * (Palette.row + 4px);
-            for f[i] in AppState.draft-fields: FieldRowView {
-                y: i * (Palette.row + 4px);
+            // Fixed keys while the fields area has focus (the move / copy actions are remappable).
+            KeyBinding {
+                keys: @keys(UpArrow);
+                activated => {
+                    root.step-field(-1);
+                }
+            }
+            KeyBinding {
+                keys: @keys(DownArrow);
+                activated => {
+                    root.step-field(1);
+                }
+            }
+            KeyBinding {
+                keys: @keys(Home);
+                activated => {
+                    root.step-field(-AppState.draft-fields.length);
+                }
+            }
+            KeyBinding {
+                keys: @keys(End);
+                activated => {
+                    root.step-field(AppState.draft-fields.length);
+                }
+            }
+            KeyBinding {
+                keys: @keys(Return);
+                activated => {
+                    AppState.field-copy(AppState.field-cursor);
+                }
+            }
+            KeyBinding {
+                keys: @keys(Control + "c");
+                activated => {
+                    AppState.field-copy(AppState.field-cursor);
+                }
+            }
+            key-pressed(e) => {
+                if (e.modifiers.control || e.modifiers.alt || e.modifiers.meta) {
+                    return reject;
+                }
+                if (e.text == Key.Backtab || (e.text == Key.Tab && e.modifiers.shift)) {
+                    root.step-field(-1);
+                    return accept;
+                }
+                if (e.text == Key.Tab) {
+                    root.step-field(1);
+                    return accept;
+                }
+                reject
+            }
+            ff := Flickable {
                 width: parent.width;
-                index: i;
-                f: f;
+                height: parent.height;
+                content-height: AppState.draft-fields.length * root.field-stride;
+                for f[i] in AppState.draft-fields: FieldRowView {
+                    y: i * root.field-stride;
+                    width: parent.width;
+                    index: i;
+                    f: f;
+                    cursor: fields-fs.has-focus && i == AppState.field-cursor;
+                }
             }
         }
         HorizontalLayout {
@@ -1280,8 +1380,8 @@ component HelpOverlay inherits Overlay {
         Panel {
             title: "keyboard shortcuts";
             active: true;
-            width: min(parent.width - 60px, 860px);
-            height: min(parent.height - 60px, 470px);
+            width: min(parent.width - 60px, 900px);
+            height: min(parent.height - 40px, 580px);
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 3;
             HorizontalLayout {
@@ -1742,6 +1842,12 @@ export component MainWindow inherits Window {
     public function focus-list() {
         list.focus-list();
     }
+    public function focus-fields() {
+        editor.focus-fields();
+    }
+    public pure function fields-focused() -> bool {
+        return editor.fields-focused();
+    }
     public function focus-search() {
         list.focus-search();
     }
@@ -1754,6 +1860,15 @@ export component MainWindow inherits Window {
     root-scope := FocusScope {
         init => {
             list.focus-list();
+        }
+        // Bound chords run before the focused widget sees them, so Alt+↑/↓ and friends
+        // work while typing in a field. Rust looks the chord up in the keymap.
+        // (Not while the keys tab records a new shortcut: that page captures it.)
+        capture-key-pressed(e) => {
+            if (AppState.recording == "" && AppState.key-capture(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta)) {
+                return accept;
+            }
+            reject
         }
         // Every remappable shortcut: built from the keymap (settings file / keys tab).
         for b in AppState.bindings: KeyBinding {

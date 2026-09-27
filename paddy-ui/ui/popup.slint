@@ -15,6 +15,11 @@ export global PopupState {
     in property <[QuickRow]> rows;
     in-out property <int> selected: -1;
     in property <[FieldRow]> fields;
+    // Keyboard cursor over the fields: Tab / Shift+Tab move it, Enter copies it.
+    in-out property <int> field-cursor: -1;
+    // Chord for "copy field N" (from the keymap), per field index.
+    in property <[string]> copy-keys;
+    in property <string> hint;
     in property <string> status;
     in property <bool> builtin-bar;
 
@@ -23,6 +28,9 @@ export global PopupState {
     callback field-edited(int, string);
     callback field-copy(int);
     callback field-toggle-hidden(int);
+    callback field-step(int);
+    // Bound chords (keymap) are offered here first; true = handled.
+    callback key-capture(string, bool, bool, bool, bool) -> bool;
     callback hide();
 }
 
@@ -51,6 +59,18 @@ export component QuickWindow inherits Window {
     FocusScope {
         // Captured (not a KeyBinding): the search TextInput would otherwise eat the arrows.
         capture-key-pressed(e) => {
+            // Remappable move / copy shortcuts (Alt+↑↓, Ctrl+1..4, ...) come from the keymap.
+            if (PopupState.key-capture(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta)) {
+                return accept;
+            }
+            if (e.text == Key.Tab && !e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt) {
+                PopupState.field-step(1);
+                return accept;
+            }
+            if (e.text == Key.Backtab || (e.text == Key.Tab && e.modifiers.shift && !e.modifiers.control && !e.modifiers.alt)) {
+                PopupState.field-step(-1);
+                return accept;
+            }
             if (e.text == Key.UpArrow) {
                 if (PopupState.selected > 0) {
                     PopupState.select(PopupState.selected - 1);
@@ -69,30 +89,6 @@ export component QuickWindow inherits Window {
             keys: @keys(Escape);
             activated => {
                 PopupState.hide();
-            }
-        }
-        KeyBinding {
-            keys: @keys(Control + "1");
-            activated => {
-                PopupState.field-copy(0);
-            }
-        }
-        KeyBinding {
-            keys: @keys(Control + "2");
-            activated => {
-                PopupState.field-copy(1);
-            }
-        }
-        KeyBinding {
-            keys: @keys(Control + "3");
-            activated => {
-                PopupState.field-copy(2);
-            }
-        }
-        KeyBinding {
-            keys: @keys(Control + "4");
-            activated => {
-                PopupState.field-copy(3);
             }
         }
 
@@ -154,7 +150,7 @@ export component QuickWindow inherits Window {
                         PopupState.query-edited();
                     }
                     accepted => {
-                        PopupState.field-copy(0);
+                        PopupState.field-copy(PopupState.field-cursor);
                     }
                 }
                 Text {
@@ -211,38 +207,53 @@ export component QuickWindow inherits Window {
                     }
                     Flickable {
                         content-height: PopupState.fields.length * (Palette.row + 4px);
-                        for f[i] in PopupState.fields: HorizontalLayout {
+                        for f[i] in PopupState.fields: Rectangle {
                             y: i * (Palette.row + 4px);
                             width: parent.width;
                             height: Palette.row;
-                            spacing: Palette.gap * 0.75;
-                            Text {
-                                text: (i < 4 ? "Ctrl+" + (i + 1) + "  " : "        ") + f.key;
-                                color: Palette.dim;
-                                width: Palette.ch * 22;
-                                vertical-alignment: center;
-                                overflow: elide;
-                            }
-                            TInput {
-                                horizontal-stretch: 1;
-                                text: f.value;
-                                password: f.secret && f.hidden;
-                                edited => {
-                                    PopupState.field-edited(i, self.text);
+                            // the Tab cursor: Enter copies this row
+                            background: i == PopupState.field-cursor ? Palette.sel-bg : transparent;
+                            border-width: 1px;
+                            border-color: i == PopupState.field-cursor ? Palette.accent : transparent;
+                            HorizontalLayout {
+                                padding-left: 4px;
+                                spacing: Palette.gap * 0.75;
+                                Text {
+                                    text: i < PopupState.copy-keys.length ? PopupState.copy-keys[i] : "";
+                                    color: i == PopupState.field-cursor ? Palette.accent : Palette.dim;
+                                    width: Palette.ch * 8;
+                                    vertical-alignment: center;
+                                    overflow: elide;
                                 }
-                            }
-                            TBtn {
-                                label: "h";
-                                on: f.hidden;
-                                visible: f.secret;
-                                clicked => {
-                                    PopupState.field-toggle-hidden(i);
+                                Text {
+                                    text: (i == PopupState.field-cursor ? "▸ " : "  ") + f.key;
+                                    color: i == PopupState.field-cursor ? Palette.fg : Palette.dim;
+                                    width: Palette.ch * 14;
+                                    vertical-alignment: center;
+                                    overflow: elide;
                                 }
-                            }
-                            TBtn {
-                                label: "c";
-                                clicked => {
-                                    PopupState.field-copy(i);
+                                TInput {
+                                    horizontal-stretch: 1;
+                                    text: f.value;
+                                    password: f.secret && f.hidden;
+                                    edited => {
+                                        PopupState.field-edited(i, self.text);
+                                    }
+                                }
+                                TBtn {
+                                    label: "h";
+                                    on: f.hidden;
+                                    visible: f.secret;
+                                    clicked => {
+                                        PopupState.field-toggle-hidden(i);
+                                    }
+                                }
+                                TBtn {
+                                    label: "c";
+                                    on: i == PopupState.field-cursor;
+                                    clicked => {
+                                        PopupState.field-copy(i);
+                                    }
                                 }
                             }
                         }
@@ -250,7 +261,7 @@ export component QuickWindow inherits Window {
                 }
             }
             Text {
-                text: "type to search   ↑↓ entry   Enter copy first   Ctrl+1-4 copy field   Esc close";
+                text: PopupState.hint;
                 color: Palette.dim;
                 overflow: elide;
             }

@@ -70,6 +70,9 @@ pub struct App {
     // vanish when the owning `Clipboard` is dropped.
     clipboard: RefCell<Option<arboard::Clipboard>>,
     status_timer: Timer,
+    /// What the last copy request was for (field key or "notes") and whether it took
+    /// the secret path (auto-clear). Never the value itself. For tests.
+    last_copy: RefCell<Option<(String, bool)>>,
 }
 
 fn entry_row(e: &Entry) -> EntryRow {
@@ -142,6 +145,7 @@ impl App {
             vars: Rc::new(VecModel::default()),
             clipboard: RefCell::new(None),
             status_timer: Timer::default(),
+            last_copy: RefCell::new(None),
         });
         *app.me.borrow_mut() = Rc::downgrade(&app);
         let st = ui.global::<AppState>();
@@ -198,7 +202,12 @@ impl App {
         bind!(on_field_remove, field_remove, i);
         bind!(on_field_toggle_secret, field_toggle_secret, i);
         bind!(on_field_toggle_hidden, field_toggle_hidden, i);
-        bind!(on_field_copy, field_copy, i);
+        {
+            let app = self.clone();
+            st.on_field_copy(move |i| {
+                app.field_copy(i);
+            });
+        }
         bind!(on_open_templates, open_templates);
         bind!(on_close_templates, close_templates);
         bind!(on_tpl_select, tpl_select, i);
@@ -329,6 +338,7 @@ impl App {
         });
         let rows: Vec<FieldRow> = entry.map(|e| e.fields.iter().map(field_row).collect()).unwrap_or_default();
         self.fields.set_vec(rows);
+        self.clamp_field_cursor();
         if self.with_state(|s| s.get_notes_preview()) {
             self.rebuild_md();
         }
@@ -433,7 +443,12 @@ impl App {
         if (i as usize) < self.fields.row_count() {
             self.fields.remove(i as usize);
             self.commit_draft();
+            self.clamp_field_cursor();
         }
+    }
+
+    pub(crate) fn field_count(&self) -> usize {
+        self.fields.row_count()
     }
 
     pub fn field_toggle_secret(&self, i: i32) {
@@ -453,15 +468,33 @@ impl App {
         }
     }
 
-    pub fn field_copy(&self, i: i32) {
-        if let Some(row) = self.fields.row_data(i as usize) {
-            let copied =
-                if row.secret { self.copy_secret(row.value.as_str()) } else { self.copy_text(row.value.as_str()) };
-            if copied {
-                let what = if row.key.is_empty() { "value" } else { row.key.as_str() };
-                self.set_status(&format!("copied {what}"), false);
-            }
+    /// Copy one field (click, keyboard, main window or quick list): secret fields go
+    /// through `copy_secret` so the clipboard auto-clear applies. Returns true if copied.
+    pub fn field_copy(&self, i: i32) -> bool {
+        match usize::try_from(i).ok().and_then(|i| self.fields.row_data(i)) {
+            Some(row) => self.copy_field_row(&row),
+            None => false,
         }
+    }
+
+    pub(crate) fn copy_field_row(&self, row: &FieldRow) -> bool {
+        let what = if row.key.is_empty() { "value" } else { row.key.as_str() };
+        *self.last_copy.borrow_mut() = Some((what.to_string(), row.secret));
+        let copied = if row.secret { self.copy_secret(row.value.as_str()) } else { self.copy_text(row.value.as_str()) };
+        if copied {
+            self.set_status(&format!("copied {what}"), false);
+        }
+        copied
+    }
+
+    pub(crate) fn note_copy(&self, what: &str, secret: bool) {
+        *self.last_copy.borrow_mut() = Some((what.to_string(), secret));
+    }
+
+    /// The last copy request: (field key or "notes", went through the secret path).
+    /// The copied value itself is not kept. For tests and embedding apps.
+    pub fn last_copy(&self) -> Option<(String, bool)> {
+        self.last_copy.borrow().clone()
     }
 
     /// Copy something secret: like `copy_text`, then remove it from the clipboard after

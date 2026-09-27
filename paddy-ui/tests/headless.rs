@@ -208,9 +208,11 @@ fn ui_smoke() {
     // ---- keys tab: rebind, conflicts, invalid chords, add, clear, reset ----
     ctrl(&win, "k");
     assert_eq!(st.get_tab(), 2);
-    assert_eq!(st.get_key_rows().row_count(), 3 + 16, "3 group headers + 16 actions");
+    assert_eq!(st.get_key_rows().row_count(), 5 + 25, "5 group headers + 25 actions");
     shot(&win, "19-keys");
     let row = |st: &AppState, id: &str| st.get_key_rows().iter().find(|r| r.id == id).unwrap();
+    assert_eq!(row(&st, "next_entry").chords, "Alt+↓  /  Alt+J");
+    assert_eq!(row(&st, "copy_field_1").chords, "Ctrl+1");
     assert_eq!(row(&st, "theme").chords, "Ctrl+L");
     assert!(row(&st, "theme").is_default);
     // rebind: theme -> Ctrl+Shift+Y
@@ -312,6 +314,101 @@ fn ui_smoke() {
     press(&win, &key(Key::Escape));
     assert!(!st.get_show_templates());
 
+    // ---- move and copy without the mouse ----
+    let alt = |k: &str| chord(&win, &[Key::Alt], k);
+    let last = || app.last_copy().expect("a copy was requested");
+    assert_eq!(st.get_selected(), 0);
+    // Alt+↓ / Alt+K work while the cursor is in a text field, and type nothing into it
+    press(&win, &key(Key::Return));
+    alt(&key(Key::DownArrow));
+    assert_eq!(st.get_selected(), 1, "Alt+↓ from inside the label field");
+    assert_eq!(st.get_draft_label(), "web01");
+    alt("k");
+    assert_eq!(st.get_selected(), 0);
+    assert_eq!(st.get_draft_label(), "dc01", "Alt+K moved instead of typing a k");
+    alt("k");
+    assert_eq!(st.get_selected(), 0, "stops at the top");
+    alt("j");
+    alt(&key(Key::UpArrow));
+    assert_eq!(st.get_selected(), 0);
+    // Ctrl+1..4 copy fields of the selected entry, through the click-to-copy path
+    ctrl(&win, "2");
+    assert_eq!(last(), ("password".to_string(), true), "secret field takes the auto-clear path");
+    ctrl(&win, "1");
+    assert_eq!(last(), ("host".to_string(), false));
+    ctrl(&win, "4");
+    assert!(st.get_status().contains("no field 4"), "{}", st.get_status());
+    assert_eq!(last().0, "host", "nothing copied for a missing field");
+    chord(&win, &[Key::Control, Key::Shift], "C");
+    assert_eq!(last(), ("notes".to_string(), false));
+    // Alt+→ walks into the fields; arrows / Tab move the cursor; Enter and Ctrl+C copy it
+    alt(&key(Key::RightArrow));
+    assert!(ui.invoke_fields_focused(), "Alt+→ puts focus in the fields area");
+    assert_eq!(st.get_field_cursor(), 0);
+    press(&win, &key(Key::DownArrow));
+    assert_eq!(st.get_field_cursor(), 1);
+    shot(&win, "27-field-cursor");
+    press(&win, &key(Key::Tab));
+    press(&win, &key(Key::Tab));
+    assert_eq!(st.get_field_cursor(), 2, "Tab stops at the last field");
+    assert!(ui.invoke_fields_focused(), "and keeps focus in the fields");
+    chord(&win, &[Key::Shift], &key(Key::Tab));
+    assert_eq!(st.get_field_cursor(), 1);
+    press(&win, &key(Key::Return));
+    assert_eq!(last(), ("password".to_string(), true));
+    alt("l");
+    ctrl(&win, "c");
+    assert_eq!(last(), ("user".to_string(), false), "Ctrl+C copies the field under the cursor");
+    press(&win, &key(Key::Home));
+    assert_eq!(st.get_field_cursor(), 0);
+    // moving to an entry without fields hands focus back to the list
+    alt(&key(Key::DownArrow));
+    assert_eq!(st.get_selected(), 1);
+    assert!(!ui.invoke_fields_focused());
+    alt(&key(Key::RightArrow));
+    assert!(st.get_status().contains("no fields"), "{}", st.get_status());
+    alt(&key(Key::UpArrow));
+    // Alt+← from outside enters at the last field; past the first it goes back to the list
+    alt(&key(Key::LeftArrow));
+    assert!(ui.invoke_fields_focused());
+    assert_eq!(st.get_field_cursor(), 2);
+    alt("h");
+    alt("h");
+    assert_eq!(st.get_field_cursor(), 0);
+    alt("h");
+    assert!(!ui.invoke_fields_focused(), "Alt+← past the first field returns to the list");
+    press(&win, &key(Key::DownArrow));
+    assert_eq!(st.get_selected(), 1, "and the list has the keyboard again");
+    press(&win, &key(Key::UpArrow));
+    // Esc leaves the fields area too
+    alt(&key(Key::RightArrow));
+    press(&win, &key(Key::Escape));
+    assert!(!ui.invoke_fields_focused());
+    // the move keys switch back from another tab; recording a chord is not stolen by them
+    ctrl(&win, ",");
+    alt(&key(Key::DownArrow));
+    assert_eq!((st.get_tab(), st.get_selected()), (0, 1));
+    ctrl(&win, "k");
+    st.invoke_key_change("prev_entry".into());
+    chord(&win, &[Key::Alt], &key(Key::PageUp));
+    assert_eq!(st.get_selected(), 1, "recorded, not run");
+    assert_eq!(st.get_recording(), "", "note={} tab={}", st.get_keys_note(), st.get_tab());
+    assert_eq!(Config::load(&cfg_path).keys["prev_entry"], "alt+pageup");
+    press(&win, &key(Key::Escape));
+    chord(&win, &[Key::Alt], &key(Key::PageUp));
+    assert_eq!(st.get_selected(), 0, "the new chord works from the list");
+    st.invoke_key_reset("prev_entry".into());
+    // help lists the new groups
+    press(&win, &key(Key::F1));
+    let what: Vec<String> =
+        st.get_help_left().iter().chain(st.get_help_right().iter()).map(|r| r.what.to_string()).collect();
+    for w in ["move", "copy", "next entry", "copy field 1", "copy notes"] {
+        assert!(what.iter().any(|x| x == w), "{w} missing from help: {what:?}");
+    }
+    shot(&win, "28-help-move-copy");
+    press(&win, &key(Key::Escape));
+    assert!(st.get_fields_hint().contains("Ctrl+1..4"), "{}", st.get_fields_hint());
+
     // down arrow selects the next entry
     press(&win, &key(slint::platform::Key::DownArrow));
     assert_eq!(st.get_selected(), 1);
@@ -365,6 +462,35 @@ fn ui_smoke() {
     type_str(&quick, "zzz");
     assert_eq!(ps.get_rows().row_count(), 0);
     assert_eq!(ps.get_selected(), -1);
+    press(&quick, &key(Key::Escape));
+    // keyboard-only copy from the popup: Tab walks the fields, Enter copies the one under the cursor
+    app.show_popup();
+    assert_eq!(ps.get_field_cursor(), 0);
+    assert!(ps.get_hint().contains("Ctrl+1..4"), "{}", ps.get_hint());
+    assert_eq!(ps.get_copy_keys().row_data(1).unwrap(), "Ctrl+2");
+    press(&quick, &key(Key::Tab));
+    press(&quick, &key(Key::Tab));
+    press(&quick, &key(Key::Tab));
+    assert_eq!(ps.get_field_cursor(), 2, "clamped at the last field");
+    chord(&quick, &[Key::Shift], &key(Key::Tab));
+    assert_eq!(ps.get_field_cursor(), 1);
+    shot(&quick, "6b-popup-field-cursor");
+    press(&quick, &key(Key::Return));
+    assert_eq!(app.last_copy().unwrap(), ("password".to_string(), true), "Enter copies the Tab cursor's field");
+    // Alt+↓ / Alt+↑ and Ctrl+N come from the same keymap as the main window
+    app.show_popup();
+    chord(&quick, &[Key::Alt], &key(Key::DownArrow));
+    assert_eq!(ps.get_selected(), 1);
+    assert_eq!(ps.get_field_cursor(), -1, "web01 has no fields");
+    chord(&quick, &[Key::Alt], "k");
+    assert_eq!(ps.get_selected(), 0);
+    assert_eq!(ps.get_query(), "", "Alt+K typed nothing into the search box");
+    ctrl(&quick, "3");
+    assert_eq!(app.last_copy().unwrap(), ("user".to_string(), false));
+    app.show_popup();
+    press(&quick, &key(Key::DownArrow));
+    ctrl(&quick, "1");
+    assert!(app.quick_visible(), "no field 1 on web01: popup stays");
     press(&quick, &key(Key::Escape));
 
     // ---- another instance saves the same vault: refuse, then overwrite on 2nd ^s ----
