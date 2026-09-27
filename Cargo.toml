@@ -3,9 +3,10 @@ resolver = "2"
 members = ["paddy-core", "paddy-net", "paddy-ui"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-license = "MIT"
+license = "LicenseRef-PolyForm-Strict-1.0.0"
+publish = false
 
 [profile.release]
 opt-level = "s"

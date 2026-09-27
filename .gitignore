@@ -12,3 +12,4 @@
 *.db
 *.db.tmp
 *.db-journal
+.claude/worktrees/

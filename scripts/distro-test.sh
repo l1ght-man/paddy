@@ -15,6 +15,8 @@ declare -A IMAGE=([kali-xfce]=kalilinux/kali-rolling [debian-openbox]=debian:bul
 SETUPS=("${@:-kali-xfce debian-openbox fedora-i3 debian-sway}")
 [ $# -eq 0 ] && SETUPS=(kali-xfce debian-openbox fedora-i3 debian-sway)
 mkdir -p target/distro-shots
+rm -f target/distro-seed.db
+cargo run -q -p paddy-core --example seed -- target/distro-seed.db 3 >/dev/null || { echo "could not seed the test vault"; exit 2; }
 # Whatever happens (finish, error, Ctrl+C, timeout): remove every test container and image.
 cleanup() {
     for s in "${SETUPS[@]}"; do
@@ -30,6 +32,7 @@ for s in "${SETUPS[@]}"; do
     # copy files in via tar on stdin (works for both docker and docker.exe)
     tar -C "$(dirname "$BIN")" -cf - paddy | "$DOCKER" exec -i "$name" sh -c 'mkdir -p /opt && tar -C /opt -xf -'
     tar -C scripts/distro -cf - inside.sh | "$DOCKER" exec -i "$name" sh -c 'tar -C /opt -xf -'
+    tar -C target --transform 's/distro-seed.db/seed.db/' -cf - distro-seed.db | "$DOCKER" exec -i "$name" sh -c 'tar -C /opt -xf -'
     "$DOCKER" exec "$name" sh /opt/inside.sh "$s" 2>&1 | grep -E "^(PASS|FAIL|NOTE|DONE|\[)|^    "
     "$DOCKER" exec "$name" sh -c 'cd /out && tar -cf - . 2>/dev/null' | tar -C target/distro-shots -xf - 2>/dev/null
     "$DOCKER" rm -f "$name" >/dev/null 2>&1
