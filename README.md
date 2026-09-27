@@ -7,6 +7,13 @@ A keyboard-first desktop pad for the IPs, hosts, credentials and commands you re
 Network engineering, labs, exams. Rust + Slint, local SQLite vaults, offline by default.
 </p>
 
+<p align="center">
+<a href="https://github.com/l1ght-man/paddy/releases/latest"><img src="https://img.shields.io/github/v/release/l1ght-man/paddy?style=flat-square" alt="release"></a>
+<a href="https://github.com/l1ght-man/paddy/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/l1ght-man/paddy/ci.yml?branch=main&style=flat-square&label=ci" alt="ci"></a>
+<img src="https://img.shields.io/badge/platform-linux%20x86__64-informational?style=flat-square" alt="platform">
+<a href="LICENSE"><img src="https://img.shields.io/github/license/l1ght-man/paddy?style=flat-square" alt="license"></a>
+</p>
+
 <p align="center"><img src="docs/media/main.png" width="820" alt="paddy main window"></p>
 
 ## Install
@@ -27,6 +34,14 @@ curl -fsSL https://raw.githubusercontent.com/l1ght-man/paddy/main/install.sh | s
 
 Options: `--system` (install to `/usr/local`), `--from-source` (build with cargo), `--no-deps`.
 Uninstalling keeps your vaults and settings.
+
+**Manual download:** grab `paddy-x86_64-linux.tar.gz` and `SHA256SUMS` from the
+[latest release](https://github.com/l1ght-man/paddy/releases/latest), then:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+tar xzf paddy-x86_64-linux.tar.gz && ./paddy-x86_64-linux/paddy
+```
 
 ## Tour
 
