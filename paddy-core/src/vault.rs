@@ -291,13 +291,11 @@ impl Vault {
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
-            fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp)
-                .map_err(Error::from)?;
+            fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp).map_err(Error::from)?;
         }
         #[cfg(not(unix))]
         {
-            fs::OpenOptions::new().write(true).create_new(true).open(&tmp)
-                .map_err(Error::from)?;
+            fs::OpenOptions::new().write(true).create_new(true).open(&tmp).map_err(Error::from)?;
         }
 
         let written = Connection::open(&tmp)

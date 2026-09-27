@@ -76,7 +76,11 @@ pub struct App {
 }
 
 fn entry_row(e: &Entry) -> EntryRow {
-    EntryRow { id: i32::try_from(e.id).unwrap_or(i32::MAX), label: e.label.as_str().into(), tags: e.tags.join(", ").into() }
+    EntryRow {
+        id: i32::try_from(e.id).unwrap_or(i32::MAX),
+        label: e.label.as_str().into(),
+        tags: e.tags.join(", ").into(),
+    }
 }
 
 pub(crate) fn field_row(f: &Field) -> FieldRow {
@@ -552,7 +556,9 @@ impl App {
     fn reload_template_rows(&self) -> Vec<Template> {
         let list = self.load_templates();
         self.templates.set_vec(
-            list.iter().map(|t| TemplateRow { id: i32::try_from(t.id).unwrap_or(i32::MAX), name: t.name.as_str().into() }).collect::<Vec<_>>(),
+            list.iter()
+                .map(|t| TemplateRow { id: i32::try_from(t.id).unwrap_or(i32::MAX), name: t.name.as_str().into() })
+                .collect::<Vec<_>>(),
         );
         list
     }
