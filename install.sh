@@ -51,7 +51,8 @@ refresh_caches() {
     have update-desktop-database && $SUDO update-desktop-database -q "$APPS" 2>/dev/null || true
 }
 
-shell_rcs() { for f in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do [ -f "$f" ] && echo "$f"; done; }
+# (if, not &&: a missing last file must not make the function fail under set -e)
+shell_rcs() { for f in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do if [ -f "$f" ]; then echo "$f"; fi; done; }
 
 # ---------------------------------------------------------------- uninstall
 if [ "$UNINSTALL" = 1 ]; then
